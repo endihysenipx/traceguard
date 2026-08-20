@@ -3,7 +3,7 @@
 ## Current State
 
 - Architecture and scope are approved.
-- Deterministic domain-core and Phases 2 through 6 are complete.
+- Deterministic domain-core and Phases 2 through 7 are complete for the approved assessment scope.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
 - Implemented the protocol-backed in-memory trace repository, append-only events/artifacts, four editable fixtures, deterministic workflow orchestrator, and stateful mock ERP.
 - Implemented the shared extraction-provider protocol, explicit `SCRIPTED`/`LIVE` modes, exact-fixture scripted adapter, and live OpenAI Responses API structured-extraction adapter.
@@ -13,8 +13,10 @@
 - Implemented one FastAPI composition root with a process-local repository/service graph, closed JSON request contracts, safe error mapping, six focused API operations, and one static HTML/CSS/vanilla-JavaScript page.
 - Implemented human-facing aggregate inspection of run facts, chronological trace/artifacts, actual tool history, evidence-grounded report, deterministic policy decisions, and controlled recovery records.
 - Added minimal OpenAI dependency/environment declarations and a credential-gated live smoke entry point.
-- Added 168 focused unit and integration-style tests; the latest full run passed with no network or API key.
-- No deployment configuration or final README/documentation polish exists yet.
+- Added 168 focused unit and integration-style tests; the final Phase 7 run passed in 2.63 seconds with no network or API key.
+- Added the final root README with reproducible setup, architecture and safety boundaries, scripted/live distinctions, scenario walkthroughs, smoke commands, limitations, and assessment-development retrospective.
+- Repository hygiene verification found no tracked cache, virtual-environment, `.env`, or compiled Python artifacts. Secret-like values found by the bounded pattern scan are deliberate fake sanitization inputs in tests.
+- No deployment configuration was added.
 
 ## Approved Architecture
 
@@ -42,9 +44,14 @@
 
 The deterministic workflow owns canonical errors. The investigator diagnoses and recommends but does not authorize or execute recovery.
 
-## Next Implementation Task
+## Final Assessment Handoff
 
-After explicit approval, implement Phase 7 only: run final verification and credential-gated live smoke checks where available, then complete README/startup/demo/architecture documentation and final assessment polish. Do not add deployment unless separately approved.
+- Implementation is complete for the approved assessment scope; there is no next implementation phase.
+- Startup entry point: `python -m uvicorn traceguard.api.app:app --reload`.
+- Full verification command: `python -m pytest -q`.
+- Both credential-gated smoke entry points were run in Phase 7 and skipped cleanly because `OPENAI_API_KEY` was unavailable. No genuine external OpenAI call was made.
+- The reproducible SCRIPTED demo requires no credentials. LIVE extraction and investigation require runtime credentials and never fall back to SCRIPTED.
+- Known limitations remain intentional: in-memory/process-local state and idempotency, a tiny runbook and taxonomy, one automatic recovery action, no authentication or production ERP, no durable crash reconciliation, no deployment, and no completed visual browser QA in the coding-agent environment.
 
 ## Phase 1 Implementation Notes
 
@@ -107,6 +114,15 @@ After explicit approval, implement Phase 7 only: run final verification and cred
 - The single static page renders three separate state cards, outcome-labelled trace events, collapsible stage artifacts, actual chronological tool calls, structured evidence roles, and an explicit AI recommendation -> deterministic policy -> controlled execution flow.
 - Local HTTP verification exercised all four scripted presets. Missing customer reached `REQUIRE_REVIEW`, invalid quantity reached `BLOCK`, and ERP unavailability used four real tool calls before policy-authorized attempt 2 reached `RECOVERED`.
 - The served page and API were verified locally, but in-app visual browser interaction could not be completed because the browser runtime failed to initialize in this environment. No LIVE request was executed.
+
+## Phase 7 Verification and Documentation Notes
+
+- The untouched baseline suite passed with 168 tests in 2.49 seconds before documentation changes.
+- The complete post-documentation suite passed with 168 tests in 2.63 seconds.
+- Both existing LIVE smoke entry points skipped cleanly because no API key was configured; this is recorded as an external-verification limitation, not a successful LIVE call.
+- The repository audit checked tracked paths, retired terminology, obvious API-key patterns, stale LIVE-verification claims, generated Python artifacts, and local environment files.
+- The architecture document was corrected to match implementation: recovery uses separate additive attempt/execution records rather than adding workflow events, all missing required fields have explicit canonical codes, and malformed investigation output fails safely without an automatic model retry.
+- The root README now provides the assessor-facing architecture, setup, test, demo, safety, tradeoff, and coding-agent review narrative.
 
 ## Constraints That Must Not Be Violated
 

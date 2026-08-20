@@ -7,6 +7,7 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+*.log
 
 # Virtual environments and local secrets
 .venv/
@@ -30,4 +31,3 @@ dist/
 .DS_Store
 Thumbs.db
 Desktop.ini
-

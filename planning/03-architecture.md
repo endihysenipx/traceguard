@@ -63,13 +63,13 @@ CREATED
 → SUCCEEDED
 ```
 
-Any active stage may transition to `FAILED`. A successful policy-authorized retry changes the recovery status to `RECOVERED` and records new events; prior events remain unchanged.
+Any active stage may transition to `FAILED`. A successful policy-authorized retry changes only the recovery status to `RECOVERED` and appends separate ERP-attempt and recovery-execution records; the original workflow events remain unchanged.
 
 The validation sequence is deliberately split:
 
 1. **LLM extraction:** converts unstructured text to an `ExtractedOrderCandidate` response.
 2. **Structural/type validation:** Pydantic verifies response shape and types. Candidate business fields may be null or absent. Invalid shape or types produce `ORDER_STRUCTURE_INVALID`.
-3. **Deterministic domain validation:** checks required data and constructs `DomainOrder`. Missing customer data produces `CUSTOMER_NUMBER_MISSING`.
+3. **Deterministic domain validation:** checks required data and constructs `DomainOrder`. Missing fields produce the specific canonical error `CUSTOMER_NUMBER_MISSING`, `PRODUCT_CODE_MISSING`, or `QUANTITY_MISSING`.
 4. **Deterministic business-rule validation:** checks rules over present, typed data and constructs `ValidatedOrder`. Non-positive quantity produces `QUANTITY_NON_POSITIVE`.
 5. **ERP submission:** sends only a `ValidatedOrder` to the mock external adapter.
 
@@ -158,7 +158,7 @@ The policy is re-evaluated immediately before execution. A permitted retry waits
 - Allowlist four read-only tools and enforce current-run scoping.
 - Hide canonical errors from the investigator but retain them for deterministic policy.
 - Enforce model-turn, tool-call, payload, and timeout limits.
-- Reject malformed output after at most one structured-output retry and block recovery.
+- Reject malformed model output and fail the bounded investigation safely; no automatic model retry is performed.
 - Sanitize provider errors and trace details; never store or display API keys or full secret-bearing requests.
 - Default policy to `BLOCK` for unknown, contradictory, or invalid conditions.
 - Use idempotency keys and recorded attempt results to prevent duplicate side effects.
