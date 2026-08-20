@@ -9,6 +9,7 @@ from traceguard.domain.enums import (
     InvestigationState,
     PolicyDecisionType,
     PolicyReason,
+    ProviderMode,
     RecoveryAction,
     RecoveryState,
     WorkflowState,
@@ -54,6 +55,7 @@ __all__ = [
     "PolicyInput",
     "PolicyOutput",
     "PolicyReason",
+    "ProviderMode",
     "RecoveryAction",
     "RecoveryState",
     "RetryMetadata",
@@ -68,4 +70,3 @@ __all__ = [
     "validate_domain_requirements",
     "validate_extracted_structure",
 ]
-

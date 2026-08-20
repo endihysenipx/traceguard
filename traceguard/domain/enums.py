@@ -3,6 +3,11 @@
 from enum import StrEnum
 
 
+class ProviderMode(StrEnum):
+    SCRIPTED = "SCRIPTED"
+    LIVE = "LIVE"
+
+
 class WorkflowState(StrEnum):
     CREATED = "CREATED"
     EXTRACTING = "EXTRACTING"
@@ -115,4 +120,3 @@ CANONICAL_FAILURE_CATEGORY: dict[CanonicalErrorCode, FailureCategory] = {
     CanonicalErrorCode.INVESTIGATION_INVALID_OUTPUT: FailureCategory.INVESTIGATION_FAILURE,
     CanonicalErrorCode.ERP_RETRY_EXHAUSTED: FailureCategory.RECOVERY_FAILURE,
 }
-

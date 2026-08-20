@@ -1,5 +1,3 @@
-from collections.abc import Callable
-
 from traceguard.domain.enums import (
     CanonicalErrorCode,
     EventOutcome,
@@ -9,6 +7,7 @@ from traceguard.domain.enums import (
     WorkflowState,
 )
 from traceguard.domain.models import ValidatedOrder
+from traceguard.extraction import ScriptedExtractionProvider
 from traceguard.workflow.erp import MockErp
 from traceguard.workflow.fixtures import SCENARIO_FIXTURES, ScenarioFixture
 from traceguard.workflow.models import (
@@ -16,6 +15,7 @@ from traceguard.workflow.models import (
     EventType,
     MockErpBehavior,
     PresetId,
+    ProviderMode,
     StageArtifactType,
     WorkflowRun,
 )
@@ -23,16 +23,36 @@ from traceguard.workflow.orchestrator import WorkflowOrchestrator
 from traceguard.workflow.repository import InMemoryTraceRepository
 
 
-def fixture_extraction(
+class StubExtractionProvider:
+    mode = ProviderMode.SCRIPTED
+
+    def __init__(
+        self,
+        output: object = None,
+        *,
+        observed_text: list[str] | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.output = output
+        self.observed_text = observed_text
+        self.error = error
+
+    def extract(self, text: str) -> object:
+        if self.error is not None:
+            raise self.error
+        if self.observed_text is not None:
+            self.observed_text.append(text)
+        return self.output
+
+
+def fixture_provider(
     fixture: ScenarioFixture,
     observed_text: list[str] | None = None,
-) -> Callable[[str], object]:
-    def extract(text: str) -> object:
-        if observed_text is not None:
-            observed_text.append(text)
-        return fixture.expected_extraction_result.model_dump(mode="json")
-
-    return extract
+) -> StubExtractionProvider:
+    return StubExtractionProvider(
+        fixture.expected_extraction_result.model_dump(mode="json"),
+        observed_text=observed_text,
+    )
 
 
 def execute_fixture(
@@ -44,7 +64,7 @@ def execute_fixture(
         order_request_text=fixture.order_request_text,
         preset_id=fixture.preset_id,
         mock_erp_behavior=fixture.mock_erp_behavior,
-        extraction=fixture_extraction(fixture),
+        provider=ScriptedExtractionProvider(),
     )
     return run, repository, erp
 
@@ -59,6 +79,7 @@ def test_success_reaches_succeeded_without_failure_facts() -> None:
     run, repository, _ = execute_fixture(SCENARIO_FIXTURES[PresetId.SUCCESS])
 
     assert run.workflow_state is WorkflowState.SUCCEEDED
+    assert run.extraction_provider_mode is ProviderMode.SCRIPTED
     assert run.investigation_state is InvestigationState.NOT_REQUIRED
     assert run.recovery_state is RecoveryState.NONE
     assert run.canonical_failure_code is None
@@ -170,12 +191,12 @@ def test_erp_noise_uses_actual_order_facts_not_preset_identity() -> None:
         ),
         preset_id=PresetId.ERP_UNAVAILABLE,
         mock_erp_behavior=MockErpBehavior.FAIL_ONCE_503,
-        extraction=lambda _: {
+        provider=StubExtractionProvider({
             "customer_number": "CUST-3003",
             "product_code": "SKU-PUMP-9",
             "quantity": 6,
             "delivery_instructions": "Deliver to loading bay 4.",
-        },
+        }),
     )
 
     event_types = [
@@ -235,7 +256,7 @@ def test_preset_id_is_metadata_and_editable_text_is_passed_unchanged() -> None:
         order_request_text=custom_text,
         preset_id=PresetId.MISSING_CUSTOMER,
         mock_erp_behavior=MockErpBehavior.SUCCEED,
-        extraction=fixture_extraction(valid_fixture, observed_text),
+        provider=fixture_provider(valid_fixture, observed_text),
     )
 
     assert run.preset_id is PresetId.MISSING_CUSTOMER
@@ -249,14 +270,13 @@ def test_extraction_dependency_failure_is_sanitized_and_deterministic() -> None:
     repository = InMemoryTraceRepository()
     erp = MockErp(repository)
 
-    def failing_extraction(_: str) -> object:
-        raise RuntimeError("api_key=super-secret provider detail")
-
     run = WorkflowOrchestrator(repository, erp).execute(
         order_request_text="A request whose extraction dependency fails.",
         preset_id=None,
         mock_erp_behavior=MockErpBehavior.SUCCEED,
-        extraction=failing_extraction,
+        provider=StubExtractionProvider(
+            error=RuntimeError("api_key=super-secret provider detail")
+        ),
     )
 
     assert run.workflow_state is WorkflowState.FAILED
@@ -281,11 +301,11 @@ def test_structural_failure_uses_existing_phase_one_validation_boundary() -> Non
     run = WorkflowOrchestrator(repository, erp).execute(
         order_request_text="Quantity was extracted with an invalid type.",
         mock_erp_behavior=MockErpBehavior.SUCCEED,
-        extraction=lambda _: {
+        provider=StubExtractionProvider({
             "customer_number": "C-1",
             "product_code": "SKU-1",
             "quantity": "three",
-        },
+        }),
     )
 
     assert run.workflow_state is WorkflowState.FAILED

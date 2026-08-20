@@ -11,6 +11,7 @@ from traceguard.domain.enums import (
     EventOutcome,
     FailureCategory,
     InvestigationState,
+    ProviderMode,
     RecoveryState,
     WorkflowState,
 )
@@ -70,6 +71,7 @@ class WorkflowRun(DomainModel):
     order_request_text: str = Field(min_length=1, max_length=10_000)
     preset_id: PresetId | None = None
     mock_erp_behavior: MockErpBehavior
+    extraction_provider_mode: ProviderMode | None = None
     workflow_state: WorkflowState = WorkflowState.CREATED
     investigation_state: InvestigationState = InvestigationState.NOT_REQUIRED
     recovery_state: RecoveryState = RecoveryState.NONE
@@ -122,4 +124,3 @@ class ErpDiagnostic(DomainModel):
 class MockErpResult(DomainModel):
     attempt: ErpAttempt
     diagnostics: tuple[ErpDiagnostic, ...] = ()
-

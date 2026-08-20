@@ -1,6 +1,5 @@
 """Deterministic order workflow orchestration."""
 
-from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
@@ -17,6 +16,7 @@ from traceguard.domain.validation import (
     validate_domain_requirements,
     validate_extracted_structure,
 )
+from traceguard.extraction.base import ExtractionProvider
 from traceguard.workflow.erp import MockErp
 from traceguard.workflow.models import (
     EventSeverity,
@@ -31,7 +31,6 @@ from traceguard.workflow.models import (
 from traceguard.workflow.repository import TraceRepository
 
 
-ExtractionCallable = Callable[[str], object]
 _JSON_VALUE_ADAPTER = TypeAdapter(JsonValue)
 
 
@@ -45,7 +44,7 @@ class WorkflowOrchestrator:
         *,
         order_request_text: str,
         mock_erp_behavior: MockErpBehavior,
-        extraction: ExtractionCallable,
+        provider: ExtractionProvider,
         preset_id: PresetId | None = None,
     ) -> WorkflowRun:
         run = self._repository.create_run(
@@ -53,6 +52,7 @@ class WorkflowOrchestrator:
                 order_request_text=order_request_text,
                 preset_id=preset_id,
                 mock_erp_behavior=mock_erp_behavior,
+                extraction_provider_mode=provider.mode,
             )
         )
         self._append_event(
@@ -73,10 +73,10 @@ class WorkflowOrchestrator:
             event_type=EventType.EXTRACTION_STARTED,
             severity=EventSeverity.INFO,
             outcome=EventOutcome.CONTINUED,
-            details="Extraction dependency invoked.",
+            details="Extraction provider invoked.",
         )
         try:
-            extraction_output = extraction(order_request_text)
+            extraction_output = provider.extract(order_request_text)
         except Exception:
             self._append_artifact(
                 run,
@@ -93,7 +93,7 @@ class WorkflowOrchestrator:
                 severity=EventSeverity.ERROR,
                 outcome=EventOutcome.TERMINAL,
                 details=(
-                    "Extraction dependency failed; provider details were not retained."
+                    "Extraction provider failed; provider details were not retained."
                 ),
             )
             return self._repository.mark_run_failed(
@@ -117,7 +117,7 @@ class WorkflowOrchestrator:
             event_type=EventType.EXTRACTION_COMPLETED,
             severity=EventSeverity.INFO,
             outcome=EventOutcome.SUCCESS,
-            details="Extraction dependency returned an output.",
+            details="Extraction provider returned an output.",
         )
 
         run = self._repository.transition_workflow(
@@ -331,4 +331,3 @@ def _safe_json_value(value: Any) -> JsonValue:
             "captured": False,
             "output_type": type(value).__name__,
         }
-

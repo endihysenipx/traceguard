@@ -8,12 +8,13 @@ from traceguard.workflow.models import (
     EventType,
     MockErpBehavior,
     PresetId,
+    ProviderMode,
     StageArtifact,
     StageArtifactType,
     TraceEvent,
     WorkflowRun,
 )
-from traceguard.workflow.orchestrator import ExtractionCallable, WorkflowOrchestrator
+from traceguard.workflow.orchestrator import WorkflowOrchestrator
 from traceguard.workflow.repository import (
     ArtifactNotFoundError,
     InMemoryTraceRepository,
@@ -26,11 +27,11 @@ __all__ = [
     "ErpAttempt",
     "EventSeverity",
     "EventType",
-    "ExtractionCallable",
     "InMemoryTraceRepository",
     "MockErp",
     "MockErpBehavior",
     "PresetId",
+    "ProviderMode",
     "RunNotFoundError",
     "SCENARIO_FIXTURES",
     "ScenarioFixture",
@@ -41,4 +42,3 @@ __all__ = [
     "WorkflowOrchestrator",
     "WorkflowRun",
 ]
-
