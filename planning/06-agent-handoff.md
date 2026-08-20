@@ -5,7 +5,7 @@
 - Architecture and scope are approved.
 - Deterministic domain-core phase is complete.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
-- Added 53 focused unit tests; the final run passed in 0.14 seconds.
+- Added 60 focused unit tests; the latest full run passed in 0.16 seconds.
 - No workflow repository/orchestrator, LLM provider, investigator loop, tools, runbook retrieval, mock ERP, FastAPI endpoint, UI, integration test, or deployment configuration exists yet.
 
 ## Approved Architecture
@@ -28,7 +28,7 @@
 - Investigation states: `NOT_REQUIRED`, `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`.
 - Recovery states: `NONE`, `ALLOW`, `BLOCK`, `REQUIRE_REVIEW`, `RETRYING`, `RECOVERED`, `RETRY_EXHAUSTED`.
 - Event outcomes: `CONTINUED`, `RECOVERED`, `TERMINAL`, `SUCCESS`.
-- Core canonical errors: `ORDER_STRUCTURE_INVALID`, `CUSTOMER_NUMBER_MISSING`, `QUANTITY_NON_POSITIVE`, `ERP_UNAVAILABLE`.
+- Core canonical errors: `ORDER_STRUCTURE_INVALID`, `CUSTOMER_NUMBER_MISSING`, `PRODUCT_CODE_MISSING`, `QUANTITY_MISSING`, `QUANTITY_NON_POSITIVE`, `ERP_UNAVAILABLE`.
 
 The deterministic workflow owns canonical errors. The investigator diagnoses and recommends but does not authorize or execute recovery.
 
@@ -39,6 +39,7 @@ After explicit approval, implement Phase 2 only: the in-memory trace repository,
 ## Phase 1 Implementation Notes
 
 - Added `PRODUCT_CODE_MISSING` and `QUANTITY_MISSING` alongside the planned core codes so every required field has an explicit deterministic domain error.
+- All three missing required-input errors return `REQUIRE_REVIEW` for correction or human-review recommendations and `BLOCK` for conflicting actions.
 - `PolicyInput` permits absent diagnosed fields only so malformed or unavailable investigation output can be represented without invented values; policy returns `BLOCK` with `INVALID_INVESTIGATION`.
 - Policy checks both diagnosed code and diagnosed category against the deterministic canonical mapping before considering an action.
 - These are contract refinements, not changes to the approved responsibility or recovery boundaries.

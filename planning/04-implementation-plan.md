@@ -103,7 +103,7 @@ Planning artifacts are phase zero. Application work starts with the deterministi
 
 ### Acceptance criteria and tests
 
-- Missing customer returns `REQUIRE_REVIEW`; negative quantity returns `BLOCK`.
+- Every missing required-input error returns `REQUIRE_REVIEW` for correction or human-review recommendations; conflicting actions and negative quantity return `BLOCK`.
 - Only eligible canonical `ERP_UNAVAILABLE` plus `RETRY_SAME_INPUT` returns `ALLOW`.
 - The allowed retry succeeds on the second total ERP attempt.
 - Repeated retry requests with the same idempotency key return the recorded outcome without another ERP call.

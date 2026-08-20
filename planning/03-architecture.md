@@ -124,7 +124,7 @@ Runbook entries have stable IDs, titles, error-code tags, symptoms, diagnostic g
 
 The policy receives the deterministic canonical error, validated recommendation, workflow state, investigation validity, retry attempt count, and idempotency-key state. It returns `ALLOW`, `BLOCK`, or `REQUIRE_REVIEW` with reason codes and constraints.
 
-- `CUSTOMER_NUMBER_MISSING` plus input correction or human review produces `REQUIRE_REVIEW`.
+- `CUSTOMER_NUMBER_MISSING`, `PRODUCT_CODE_MISSING`, or `QUANTITY_MISSING` plus input correction or human review produces `REQUIRE_REVIEW`; conflicting actions remain blocked.
 - `QUANTITY_NON_POSITIVE` always produces `BLOCK`.
 - `ERP_UNAVAILABLE` plus `RETRY_SAME_INPUT` may produce `ALLOW` only with a valid report, an idempotency key, and fewer than two total ERP attempts.
 - Conflicts, malformed reports, unknown errors, missing idempotency, and exhausted retries produce `BLOCK`.

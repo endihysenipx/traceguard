@@ -7,11 +7,16 @@
 
 ## Where the Coding Agent Failed or Made Poor Assumptions
 
+- Adding explicit `PRODUCT_CODE_MISSING` and `QUANTITY_MISSING` canonical errors was useful, but the coding agent initially left their recovery-policy consequences inconsistent with `CUSTOMER_NUMBER_MISSING`.
+
 ## Human Corrections and Overrides
+
+- Human review identified the semantic inconsistency and required all missing required-input failures to use the same `REQUIRE_REVIEW` behavior for correction or human-review recommendations.
 
 ## Debugging Episodes
 
 - The normal workspace patch helper could not launch because the Windows sandbox setup executable was missing. The agent verified the failure, used the Codex patch engine outside the broken sandbox with explicit approval, and kept all changes within the approved domain-core and planning files.
+- Generated Python cache artifacts were accidentally tracked. They were removed from Git tracking and covered by a root `.gitignore`.
 
 ## Scope Changes
 

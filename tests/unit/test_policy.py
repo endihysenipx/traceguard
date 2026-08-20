@@ -107,9 +107,20 @@ def test_policy_blocks_conflicting_diagnosed_category() -> None:
         RecoveryAction.REQUEST_HUMAN_REVIEW,
     ],
 )
-def test_missing_customer_requires_review(action: RecoveryAction) -> None:
+@pytest.mark.parametrize(
+    "code",
+    [
+        CanonicalErrorCode.CUSTOMER_NUMBER_MISSING,
+        CanonicalErrorCode.PRODUCT_CODE_MISSING,
+        CanonicalErrorCode.QUANTITY_MISSING,
+    ],
+)
+def test_missing_required_input_requires_review(
+    code: CanonicalErrorCode,
+    action: RecoveryAction,
+) -> None:
     result = evaluate_recovery_policy(
-        policy_input(CanonicalErrorCode.CUSTOMER_NUMBER_MISSING, action)
+        policy_input(code, action)
     )
 
     assert result.decision is PolicyDecisionType.REQUIRE_REVIEW
@@ -117,12 +128,24 @@ def test_missing_customer_requires_review(action: RecoveryAction) -> None:
     assert result.reason_codes == [PolicyReason.HUMAN_INPUT_REQUIRED]
 
 
-def test_missing_customer_blocks_conflicting_retry_recommendation() -> None:
+@pytest.mark.parametrize(
+    "code",
+    [
+        CanonicalErrorCode.CUSTOMER_NUMBER_MISSING,
+        CanonicalErrorCode.PRODUCT_CODE_MISSING,
+        CanonicalErrorCode.QUANTITY_MISSING,
+    ],
+)
+@pytest.mark.parametrize(
+    "action",
+    [RecoveryAction.NO_ACTION, RecoveryAction.RETRY_SAME_INPUT],
+)
+def test_missing_required_input_blocks_conflicting_action(
+    code: CanonicalErrorCode,
+    action: RecoveryAction,
+) -> None:
     result = evaluate_recovery_policy(
-        policy_input(
-            CanonicalErrorCode.CUSTOMER_NUMBER_MISSING,
-            RecoveryAction.RETRY_SAME_INPUT,
-        )
+        policy_input(code, action)
     )
 
     assert_blocked(result, PolicyReason.ACTION_CONFLICT)
@@ -204,8 +227,6 @@ def test_erp_unavailable_allows_bounded_idempotent_retry(
     [
         CanonicalErrorCode.EXTRACTION_MODEL_ERROR,
         CanonicalErrorCode.ORDER_STRUCTURE_INVALID,
-        CanonicalErrorCode.PRODUCT_CODE_MISSING,
-        CanonicalErrorCode.QUANTITY_MISSING,
         CanonicalErrorCode.ERP_REJECTED,
         CanonicalErrorCode.INVESTIGATION_INVALID_OUTPUT,
         CanonicalErrorCode.ERP_RETRY_EXHAUSTED,

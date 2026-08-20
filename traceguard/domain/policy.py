@@ -13,6 +13,13 @@ from traceguard.domain.models import PolicyConstraints, PolicyInput, PolicyOutpu
 
 MAX_TOTAL_ERP_ATTEMPTS = 2
 ERP_RETRY_BACKOFF_SECONDS = 1
+MISSING_REQUIRED_INPUT_ERRORS = frozenset(
+    {
+        CanonicalErrorCode.CUSTOMER_NUMBER_MISSING,
+        CanonicalErrorCode.PRODUCT_CODE_MISSING,
+        CanonicalErrorCode.QUANTITY_MISSING,
+    }
+)
 
 
 def evaluate_recovery_policy(policy_input: PolicyInput) -> PolicyOutput:
@@ -38,7 +45,7 @@ def evaluate_recovery_policy(policy_input: PolicyInput) -> PolicyOutput:
     ):
         return _block(PolicyReason.DIAGNOSIS_CONFLICT)
 
-    if policy_input.canonical_error_code is CanonicalErrorCode.CUSTOMER_NUMBER_MISSING:
+    if policy_input.canonical_error_code in MISSING_REQUIRED_INPUT_ERRORS:
         if policy_input.recommended_action in {
             RecoveryAction.REQUEST_INPUT_CORRECTION,
             RecoveryAction.REQUEST_HUMAN_REVIEW,

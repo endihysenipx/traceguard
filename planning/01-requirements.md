@@ -86,7 +86,7 @@ The primary user is an engineer or workflow operator investigating a failed AI-a
 - Each scenario reaches the expected validation stage and canonical deterministic error.
 - Failed runs are investigated through observable tool calls rather than a full-context prompt.
 - The noisy ERP scenario is diagnosed as `ERP_UNAVAILABLE`, with terminal ERP evidence cited and recovered warnings not treated as causal.
-- Policy returns `REQUIRE_REVIEW` for missing customer data, `BLOCK` for invalid quantity, and `ALLOW` for an eligible ERP retry.
+- Policy returns `REQUIRE_REVIEW` for any missing required input when correction or human review is recommended, `BLOCK` for invalid quantity, and `ALLOW` for an eligible ERP retry.
 - The allowed retry succeeds once, and duplicate retry requests do not duplicate the ERP side effect.
 - Malformed investigator output and adversarial trace content fail safely.
 - The default automated suite passes without an API key; an opt-in live smoke test covers real extraction and tool use.
