@@ -13,10 +13,14 @@ from traceguard.domain.enums import (
     InvestigationFailureReason,
     InvestigationState,
     ProviderMode,
+    PolicyDecisionType,
+    PolicyReason,
+    RecoveryAction,
+    RecoveryExecutionStatus,
     RecoveryState,
     WorkflowState,
 )
-from traceguard.domain.models import DomainModel
+from traceguard.domain.models import DomainModel, PolicyConstraints
 
 
 def utc_now() -> datetime:
@@ -146,3 +150,28 @@ class InvestigationFailure(DomainModel):
     run_id: UUID
     reason: InvestigationFailureReason
     details: str = Field(min_length=1, max_length=240)
+
+
+class RecoveryDecisionRecord(DomainModel):
+    decision_record_id: UUID = Field(default_factory=uuid4)
+    timestamp: datetime = Field(default_factory=utc_now)
+    run_id: UUID
+    investigation_report_id: UUID
+    decision: PolicyDecisionType
+    allowed_action: RecoveryAction | None = None
+    reason_codes: tuple[PolicyReason, ...] = Field(min_length=1)
+    constraints: PolicyConstraints = Field(default_factory=PolicyConstraints)
+
+
+class RecoveryExecutionRecord(DomainModel):
+    record_id: UUID = Field(default_factory=uuid4)
+    execution_id: UUID = Field(default_factory=uuid4)
+    timestamp: datetime = Field(default_factory=utc_now)
+    run_id: UUID
+    decision_record_id: UUID
+    investigation_report_id: UUID
+    idempotency_key: str = Field(min_length=1, max_length=200)
+    action: RecoveryAction
+    status: RecoveryExecutionStatus
+    erp_attempt_number: int | None = Field(default=None, ge=1)
+    result_summary: str = Field(min_length=1, max_length=240)

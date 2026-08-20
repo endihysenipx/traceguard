@@ -7,6 +7,7 @@
 - The coding agent implemented the Phase 2 trace repository, editable fixtures, workflow orchestrator, and stateful noisy mock ERP without adding later-phase components. The full 77-test suite passed on the first Phase 2 run.
 - The coding agent implemented the exact-fixture and live OpenAI extraction providers, preserved the deterministic validation boundary, and completed Phase 3 with 96 passing network-free tests.
 - The coding agent implemented the tagged runbook, four scoped diagnostic tools, additive tool history, scripted and live bounded investigator paths, and causal evidence enforcement. Phase 4 completed with 132 passing network-free tests.
+- The coding agent implemented deterministic recovery authorization, observable policy/execution histories, a repository-enforced idempotency claim, and the single bounded ERP retry. Phase 5 completed with 146 passing network-free tests while preserving the original failed workflow evidence.
 
 ## Where the Coding Agent Failed or Made Poor Assumptions
 
@@ -27,11 +28,15 @@
 - An optional Ruff check was attempted after the Phase 2 tests, but Ruff was not installed. The agent did not add an unplanned dependency and retained the passing full test suite as the required verification.
 - The first Phase 3 test run exposed a circular import because `ProviderMode` was initially placed in the workflow package while the workflow orchestrator imported the extraction protocol. The agent moved the cross-cutting enum to the dependency-neutral domain enum module and the complete suite then passed.
 - A combined Phase 4 patch exceeded the Windows command-length limit before applying changes. The agent split it into smaller atomic patches and continued without partial repository edits.
+- The Phase 5 patch workaround initially used Base64 helpers unavailable in the tool runtime (`btoa`, then `TextEncoder`). Both orchestration calls failed before changing files; the agent switched to the established character-based encoder and continued successfully.
 
 ## Scope Changes
+
+- The Phase 5 planning phrase controlled ERP retry endpoint was corrected to controlled ERP retry domain path so FastAPI assembly remains in Phase 6, consistent with the approved phase boundary.
 
 ## Current Weaknesses
 
 - No `OPENAI_API_KEY` was available during Phases 3 or 4, so both opt-in smoke entry points skipped cleanly and the real external extraction and investigator paths have not yet been exercised locally.
+- Recovery idempotency and records are intentionally process-local. A `STARTED` claim fails safe after interruption, but durable crash reconciliation and distributed locking remain outside this in-memory assessment scope.
 
 ## Future Improvements

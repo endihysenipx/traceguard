@@ -44,6 +44,13 @@ class RecoveryState(StrEnum):
     RETRY_EXHAUSTED = "RETRY_EXHAUSTED"
 
 
+class RecoveryExecutionStatus(StrEnum):
+    STARTED = "STARTED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    BLOCKED = "BLOCKED"
+
+
 class FailureCategory(StrEnum):
     EXTRACTION_FAILURE = "EXTRACTION_FAILURE"
     STRUCTURAL_VALIDATION_FAILURE = "STRUCTURAL_VALIDATION_FAILURE"

@@ -11,11 +11,15 @@ from traceguard.domain.enums import (
     FailureCategory,
     InvestigationState,
     ProviderMode,
+    RecoveryAction,
+    RecoveryExecutionStatus,
+    RecoveryState,
     WorkflowState,
 )
 from traceguard.domain.models import InvestigationReport
 from traceguard.domain.transitions import (
     ensure_investigation_transition,
+    ensure_recovery_transition,
     ensure_workflow_transition,
 )
 from traceguard.workflow.models import (
@@ -23,6 +27,8 @@ from traceguard.workflow.models import (
     InvestigationFailure,
     InvestigationToolCall,
     MockErpBehavior,
+    RecoveryDecisionRecord,
+    RecoveryExecutionRecord,
     StageArtifact,
     StageArtifactType,
     TraceEvent,
@@ -105,6 +111,50 @@ class TraceRepository(Protocol):
 
     def get_investigation_failure(self, run_id: UUID) -> InvestigationFailure: ...
 
+    def transition_recovery(
+        self, run_id: UUID, target: RecoveryState
+    ) -> WorkflowRun: ...
+
+    def append_recovery_decision(
+        self, record: RecoveryDecisionRecord
+    ) -> RecoveryDecisionRecord: ...
+
+    def list_recovery_decisions(
+        self, run_id: UUID
+    ) -> Sequence[RecoveryDecisionRecord]: ...
+
+    def get_recovery_decision(
+        self, run_id: UUID, decision_record_id: UUID
+    ) -> RecoveryDecisionRecord: ...
+
+    def begin_recovery_execution(
+        self,
+        run_id: UUID,
+        *,
+        decision_record_id: UUID,
+        investigation_report_id: UUID,
+        idempotency_key: str,
+        action: RecoveryAction,
+    ) -> tuple[RecoveryExecutionRecord, bool]: ...
+
+    def complete_recovery_execution(
+        self,
+        run_id: UUID,
+        *,
+        execution_id: UUID,
+        status: RecoveryExecutionStatus,
+        erp_attempt_number: int | None,
+        result_summary: str,
+    ) -> RecoveryExecutionRecord: ...
+
+    def list_recovery_executions(
+        self, run_id: UUID
+    ) -> Sequence[RecoveryExecutionRecord]: ...
+
+    def get_latest_recovery_execution(
+        self, run_id: UUID, idempotency_key: str
+    ) -> RecoveryExecutionRecord: ...
+
 
 class TraceRepositoryError(RuntimeError):
     """Base error for explicit repository failures."""
@@ -130,6 +180,10 @@ class InvestigationRecordNotFoundError(TraceRepositoryError):
     pass
 
 
+class RecoveryRecordNotFoundError(TraceRepositoryError):
+    pass
+
+
 class InMemoryTraceRepository:
     """Thread-safe process-local storage; intentionally not production persistence."""
 
@@ -141,9 +195,13 @@ class InMemoryTraceRepository:
         self._investigation_calls: dict[UUID, list[InvestigationToolCall]] = {}
         self._investigation_reports: dict[UUID, InvestigationReport] = {}
         self._investigation_failures: dict[UUID, InvestigationFailure] = {}
+        self._recovery_decisions: dict[UUID, list[RecoveryDecisionRecord]] = {}
+        self._recovery_executions: dict[UUID, list[RecoveryExecutionRecord]] = {}
+        self._claimed_recovery_keys: dict[tuple[UUID, str], UUID] = {}
         self._event_ids: set[UUID] = set()
         self._artifact_ids: set[UUID] = set()
         self._investigation_call_ids: set[UUID] = set()
+        self._recovery_decision_ids: set[UUID] = set()
         self._lock = RLock()
 
     def create_run(self, run: WorkflowRun) -> WorkflowRun:
@@ -158,6 +216,8 @@ class InMemoryTraceRepository:
             self._artifacts[run.run_id] = []
             self._erp_attempts[run.run_id] = []
             self._investigation_calls[run.run_id] = []
+            self._recovery_decisions[run.run_id] = []
+            self._recovery_executions[run.run_id] = []
             return stored.model_copy(deep=True)
 
     def get_run(self, run_id: UUID) -> WorkflowRun:
@@ -409,6 +469,155 @@ class InMemoryTraceRepository:
                 raise InvestigationRecordNotFoundError(
                     f"No investigation failure for run {run_id}"
                 ) from exc
+
+    def transition_recovery(
+        self, run_id: UUID, target: RecoveryState
+    ) -> WorkflowRun:
+        with self._lock:
+            current = self._require_run(run_id)
+            if current.workflow_state is not WorkflowState.FAILED:
+                raise TraceRepositoryError(
+                    "Recovery state may change only for a failed workflow run."
+                )
+            ensure_recovery_transition(current.recovery_state, target)
+            updated = self._replace_run(current, recovery_state=target)
+            self._runs[run_id] = updated
+            return updated.model_copy(deep=True)
+
+    def append_recovery_decision(
+        self, record: RecoveryDecisionRecord
+    ) -> RecoveryDecisionRecord:
+        with self._lock:
+            self._require_run(record.run_id)
+            report = self._investigation_reports.get(record.run_id)
+            if report is None or report.report_id != record.investigation_report_id:
+                raise TraceRepositoryError(
+                    "Recovery decision must reference the stored investigation report."
+                )
+            if record.decision_record_id in self._recovery_decision_ids:
+                raise DuplicateTraceRecordError(
+                    f"Recovery decision already exists: {record.decision_record_id}"
+                )
+            stored = record.model_copy(deep=True)
+            self._recovery_decisions[record.run_id].append(stored)
+            self._recovery_decision_ids.add(record.decision_record_id)
+            return stored.model_copy(deep=True)
+
+    def list_recovery_decisions(
+        self, run_id: UUID
+    ) -> tuple[RecoveryDecisionRecord, ...]:
+        with self._lock:
+            self._require_run(run_id)
+            return tuple(
+                record.model_copy(deep=True)
+                for record in self._recovery_decisions[run_id]
+            )
+
+    def get_recovery_decision(
+        self, run_id: UUID, decision_record_id: UUID
+    ) -> RecoveryDecisionRecord:
+        decisions = self.list_recovery_decisions(run_id)
+        for decision in decisions:
+            if decision.decision_record_id == decision_record_id:
+                return decision
+        raise RecoveryRecordNotFoundError(
+            f"No recovery decision {decision_record_id} for run {run_id}"
+        )
+
+    def begin_recovery_execution(
+        self,
+        run_id: UUID,
+        *,
+        decision_record_id: UUID,
+        investigation_report_id: UUID,
+        idempotency_key: str,
+        action: RecoveryAction,
+    ) -> tuple[RecoveryExecutionRecord, bool]:
+        with self._lock:
+            self._require_run(run_id)
+            key = (run_id, idempotency_key)
+            existing_id = self._claimed_recovery_keys.get(key)
+            if existing_id is not None:
+                return self._latest_execution_for_id(run_id, existing_id), False
+            decision = self.get_recovery_decision(run_id, decision_record_id)
+            if decision.investigation_report_id != investigation_report_id:
+                raise TraceRepositoryError(
+                    "Recovery execution report does not match its decision."
+                )
+            record = RecoveryExecutionRecord(
+                run_id=run_id,
+                decision_record_id=decision_record_id,
+                investigation_report_id=investigation_report_id,
+                idempotency_key=idempotency_key,
+                action=action,
+                status=RecoveryExecutionStatus.STARTED,
+                result_summary="Authorized recovery execution started.",
+            )
+            self._recovery_executions[run_id].append(record)
+            self._claimed_recovery_keys[key] = record.execution_id
+            return record.model_copy(deep=True), True
+
+    def complete_recovery_execution(
+        self,
+        run_id: UUID,
+        *,
+        execution_id: UUID,
+        status: RecoveryExecutionStatus,
+        erp_attempt_number: int | None,
+        result_summary: str,
+    ) -> RecoveryExecutionRecord:
+        if status is RecoveryExecutionStatus.STARTED:
+            raise TraceRepositoryError("A recovery execution needs a terminal status.")
+        with self._lock:
+            started = self._latest_execution_for_id(run_id, execution_id)
+            if started.status is not RecoveryExecutionStatus.STARTED:
+                return started
+            completed = RecoveryExecutionRecord(
+                execution_id=started.execution_id,
+                run_id=run_id,
+                decision_record_id=started.decision_record_id,
+                investigation_report_id=started.investigation_report_id,
+                idempotency_key=started.idempotency_key,
+                action=started.action,
+                status=status,
+                erp_attempt_number=erp_attempt_number,
+                result_summary=result_summary,
+            )
+            self._recovery_executions[run_id].append(completed)
+            return completed.model_copy(deep=True)
+
+    def list_recovery_executions(
+        self, run_id: UUID
+    ) -> tuple[RecoveryExecutionRecord, ...]:
+        with self._lock:
+            self._require_run(run_id)
+            return tuple(
+                record.model_copy(deep=True)
+                for record in self._recovery_executions[run_id]
+            )
+
+    def get_latest_recovery_execution(
+        self, run_id: UUID, idempotency_key: str
+    ) -> RecoveryExecutionRecord:
+        with self._lock:
+            self._require_run(run_id)
+            execution_id = self._claimed_recovery_keys.get((run_id, idempotency_key))
+            if execution_id is None:
+                raise RecoveryRecordNotFoundError(
+                    f"No recovery execution for run {run_id} and idempotency key."
+                )
+            return self._latest_execution_for_id(run_id, execution_id)
+
+    def _latest_execution_for_id(
+        self, run_id: UUID, execution_id: UUID
+    ) -> RecoveryExecutionRecord:
+        self._require_run(run_id)
+        for record in reversed(self._recovery_executions[run_id]):
+            if record.execution_id == execution_id:
+                return record.model_copy(deep=True)
+        raise RecoveryRecordNotFoundError(
+            f"No recovery execution {execution_id} for run {run_id}"
+        )
 
     def _require_run(self, run_id: UUID) -> WorkflowRun:
         try:

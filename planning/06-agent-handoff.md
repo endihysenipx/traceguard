@@ -3,14 +3,16 @@
 ## Current State
 
 - Architecture and scope are approved.
-- Deterministic domain-core and Phases 2 through 4 are complete.
+- Deterministic domain-core and Phases 2 through 5 are complete.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
 - Implemented the protocol-backed in-memory trace repository, append-only events/artifacts, four editable fixtures, deterministic workflow orchestrator, and stateful mock ERP.
 - Implemented the shared extraction-provider protocol, explicit `SCRIPTED`/`LIVE` modes, exact-fixture scripted adapter, and live OpenAI Responses API structured-extraction adapter.
 - Implemented the five-entry tagged local runbook, deterministic exact-tag/lexical retrieval, exactly four scoped read-only tools, append-only tool-call history, causal evidence validation, and one three-turn/six-call investigator with scripted and live model paths.
+- Implemented a deterministic recovery coordinator that constructs policy input from stored workflow/report facts, persists append-only decisions, and executes only a policy-authorized same-input ERP retry.
+- Implemented append-only recovery execution lifecycle records, repository-level idempotency claims, current-state policy re-evaluation, a policy-provided backoff seam, and terminal `RECOVERED`/`RETRY_EXHAUSTED` outcomes without rewriting the failed workflow.
 - Added minimal OpenAI dependency/environment declarations and a credential-gated live smoke entry point.
-- Added 132 focused unit and integration-style tests; the latest full run passed in 1.87 seconds with no network or API key.
-- No controlled recovery execution, FastAPI endpoint, UI, deployment configuration, or final README work exists yet.
+- Added 146 focused unit and integration-style tests; the latest full run passed in 1.83 seconds with no network or API key.
+- No FastAPI endpoint, UI, deployment configuration, or final README work exists yet.
 
 ## Approved Architecture
 
@@ -40,7 +42,7 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 
 ## Next Implementation Task
 
-After explicit approval, implement Phase 5 only: connect validated investigation reports to the existing deterministic recovery policy and add one idempotent, policy-authorized ERP retry path. Keep FastAPI routes and UI out of that task unless separately approved.
+After explicit approval, implement Phase 6 only: assemble the FastAPI routes and thin static demo UI around the completed workflow, investigation, policy, and controlled-recovery services. Do not begin deployment or final README work unless separately approved.
 
 ## Phase 1 Implementation Notes
 
@@ -80,6 +82,17 @@ After explicit approval, implement Phase 5 only: connect validated investigation
 - `OpenAIInvestigatorModel` uses the official Responses API `responses.parse` tool loop with strict function schemas, structured `InvestigationReport`, `store=False`, disabled parallel calls, a bounded timeout, and stateless replay of response items plus function outputs.
 - Runs retain separate extraction and investigation provider-mode metadata. `TRACEGUARD_OPENAI_INVESTIGATOR_MODEL` overrides the shared model setting when present.
 - The live investigator smoke entry point skipped cleanly because no API key was available; the external live investigator remains unverified locally.
+
+## Phase 5 Implementation Notes
+
+- `RecoveryCoordinator.recover(run_id)` accepts no caller-supplied action or canonical facts. It loads the failed run and completed stored report, builds `PolicyInput`, and delegates authorization to the existing `evaluate_recovery_policy()` function.
+- Policy decision records are append-only and retain report ID, decision, allowed action, reason codes, and constraints. Recovery execution history is also append-only: an atomic `STARTED` claim for the run/idempotency key precedes any side effect, followed by `SUCCEEDED`, `FAILED`, or `BLOCKED`.
+- Before the ERP call, the coordinator reloads repository state, verifies the current stored `ALLOW` decision/report/action/key/limits, and re-evaluates policy with the current attempt count. Stale or inconsistent authorization fails closed.
+- The retry reconstructs a strict `ValidatedOrder` from the successful business-validation artifact. It does not rerun extraction, validation, or investigation, and it never edits submitted input.
+- The authorized `FAIL_ONCE_503` retry honors the policy's one-second backoff and succeeds as total ERP attempt 2. Duplicate calls return the recorded execution and cannot create attempt 3.
+- Retry failure transitions only recovery state to `RETRY_EXHAUSTED`; workflow state, canonical failure, original events, investigation report, and tool history remain intact.
+- Phase 5 deliberately added no recovery tool to the investigator. Its registry remains exactly four read-only tools.
+- The implementation plan's earlier phrase controlled ERP retry endpoint was clarified to domain path; HTTP assembly remains Phase 6 as required by the approved sequencing.
 
 ## Constraints That Must Not Be Violated
 

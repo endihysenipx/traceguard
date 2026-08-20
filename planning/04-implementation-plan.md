@@ -94,7 +94,7 @@ Planning artifacts are phase zero. Application work starts with the deterministi
 ### Tasks
 
 - Connect validated investigation output to deterministic policy.
-- Implement idempotency-key creation, attempt records, policy re-evaluation, one-second backoff, and the controlled ERP retry endpoint.
+- Implement idempotency-key creation, attempt records, policy re-evaluation, one-second backoff, and the controlled ERP retry domain path. The API endpoint belongs to Phase 6.
 - Preserve the failed workflow trace while adding recovery events and statuses.
 
 ### Dependencies
