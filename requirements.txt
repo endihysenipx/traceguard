@@ -1,2 +1,4 @@
 openai>=2.0,<3
 pydantic>=2.12,<3
+fastapi>=0.115,<1
+uvicorn>=0.34,<1

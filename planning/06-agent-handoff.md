@@ -3,16 +3,18 @@
 ## Current State
 
 - Architecture and scope are approved.
-- Deterministic domain-core and Phases 2 through 5 are complete.
+- Deterministic domain-core and Phases 2 through 6 are complete.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
 - Implemented the protocol-backed in-memory trace repository, append-only events/artifacts, four editable fixtures, deterministic workflow orchestrator, and stateful mock ERP.
 - Implemented the shared extraction-provider protocol, explicit `SCRIPTED`/`LIVE` modes, exact-fixture scripted adapter, and live OpenAI Responses API structured-extraction adapter.
 - Implemented the five-entry tagged local runbook, deterministic exact-tag/lexical retrieval, exactly four scoped read-only tools, append-only tool-call history, causal evidence validation, and one three-turn/six-call investigator with scripted and live model paths.
 - Implemented a deterministic recovery coordinator that constructs policy input from stored workflow/report facts, persists append-only decisions, and executes only a policy-authorized same-input ERP retry.
 - Implemented append-only recovery execution lifecycle records, repository-level idempotency claims, current-state policy re-evaluation, a policy-provided backoff seam, and terminal `RECOVERED`/`RETRY_EXHAUSTED` outcomes without rewriting the failed workflow.
+- Implemented one FastAPI composition root with a process-local repository/service graph, closed JSON request contracts, safe error mapping, six focused API operations, and one static HTML/CSS/vanilla-JavaScript page.
+- Implemented human-facing aggregate inspection of run facts, chronological trace/artifacts, actual tool history, evidence-grounded report, deterministic policy decisions, and controlled recovery records.
 - Added minimal OpenAI dependency/environment declarations and a credential-gated live smoke entry point.
-- Added 147 focused unit and integration-style tests; the latest full run passed in 1.88 seconds with no network or API key.
-- No FastAPI endpoint, UI, deployment configuration, or final README work exists yet.
+- Added 168 focused unit and integration-style tests; the latest full run passed with no network or API key.
+- No deployment configuration or final README/documentation polish exists yet.
 
 ## Approved Architecture
 
@@ -42,7 +44,7 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 
 ## Next Implementation Task
 
-After explicit approval, implement Phase 6 only: assemble the FastAPI routes and thin static demo UI around the completed workflow, investigation, policy, and controlled-recovery services. Do not begin deployment or final README work unless separately approved.
+After explicit approval, implement Phase 7 only: run final verification and credential-gated live smoke checks where available, then complete README/startup/demo/architecture documentation and final assessment polish. Do not add deployment unless separately approved.
 
 ## Phase 1 Implementation Notes
 
@@ -94,6 +96,17 @@ After explicit approval, implement Phase 6 only: assemble the FastAPI routes and
 - Retry failure transitions only recovery state to `RETRY_EXHAUSTED`; workflow state, canonical failure, original events, investigation report, and tool history remain intact.
 - Phase 5 deliberately added no recovery tool to the investigator. Its registry remains exactly four read-only tools.
 - The implementation plan's earlier phrase controlled ERP retry endpoint was clarified to domain path; HTTP assembly remains Phase 6 as required by the approved sequencing.
+
+## Phase 6 Implementation Notes
+
+- `create_services()` builds one process-local repository, mock ERP, runbook, workflow orchestrator, investigator, and recovery coordinator. `create_app(services)` supports isolated test graphs while the module-level app supplies safe local defaults.
+- Routes expose presets, run creation, aggregate run inspection, investigation, separate recovery evaluation, and deterministic recovery execution. Closed Pydantic request bodies reject caller-supplied canonical errors, states, recommendations, decisions, keys, and attempt counts.
+- Extraction and investigation modes are independent. SCRIPTED uses exact fixture text and deterministic tool use; LIVE constructs the existing OpenAI adapters and fails safely without fallback when configuration is unavailable.
+- The scripted provider exposes an exact-text `supports()` check so the API can return `LIVE_PROVIDER_REQUIRED` before workflow creation. Preset identity is not consulted for matching or workflow decisions.
+- Aggregate responses expose canonical errors to the human UI while leaving the Phase 4 investigator overview/initial-context boundary unchanged. Policy/execution views expose idempotency enforcement without returning the raw idempotency key.
+- The single static page renders three separate state cards, outcome-labelled trace events, collapsible stage artifacts, actual chronological tool calls, structured evidence roles, and an explicit AI recommendation -> deterministic policy -> controlled execution flow.
+- Local HTTP verification exercised all four scripted presets. Missing customer reached `REQUIRE_REVIEW`, invalid quantity reached `BLOCK`, and ERP unavailability used four real tool calls before policy-authorized attempt 2 reached `RECOVERED`.
+- The served page and API were verified locally, but in-app visual browser interaction could not be completed because the browser runtime failed to initialize in this environment. No LIVE request was executed.
 
 ## Constraints That Must Not Be Violated
 

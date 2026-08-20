@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TraceGuard</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">AI-NATIVE WORKFLOW SAFETY</p>
+      <h1>TraceGuard</h1>
+      <p class="subtitle">Agentic Workflow Investigator &amp; Safe Recovery</p>
+    </div>
+    <div class="boundary-badge">Agent recommends <span>Deterministic policy authorizes</span></div>
+  </header>
+
+  <main>
+    <section class="panel controls" aria-labelledby="controls-heading">
+      <div class="section-heading">
+        <div><p class="step">01 / RUN</p><h2 id="controls-heading">Create an order workflow</h2></div>
+        <p>Presets fill editable input. The submitted text and explicit ERP behavior drive the run.</p>
+      </div>
+      <div id="preset-list" class="preset-grid" aria-label="Scenario presets"></div>
+      <div class="form-grid">
+        <label class="textarea-field">Order request
+          <textarea id="order-text" rows="6" maxlength="10000"></textarea>
+        </label>
+        <div class="mode-stack">
+          <label>Extraction provider
+            <select id="extraction-mode"><option>SCRIPTED</option><option>LIVE</option></select>
+          </label>
+          <label>Investigation provider
+            <select id="investigation-mode"><option>SCRIPTED</option><option>LIVE</option></select>
+          </label>
+          <label>Mock ERP behavior
+            <select id="erp-behavior"><option>SUCCEED</option><option>FAIL_ONCE_503</option></select>
+          </label>
+          <button id="run-button" class="primary">Run workflow</button>
+        </div>
+      </div>
+      <div id="message" class="message" role="status" hidden></div>
+    </section>
+
+    <section id="workspace" hidden>
+      <section class="panel status-panel" aria-labelledby="status-heading">
+        <div class="section-heading">
+          <div><p class="step">02 / STATUS</p><h2 id="status-heading">Orthogonal run state</h2></div>
+          <code id="run-id"></code>
+        </div>
+        <div class="state-grid">
+          <article><span>Workflow</span><strong id="workflow-state"></strong></article>
+          <article><span>Investigation</span><strong id="investigation-state"></strong></article>
+          <article><span>Recovery</span><strong id="recovery-state"></strong></article>
+        </div>
+        <div id="run-facts" class="facts"></div>
+        <div id="actions" class="actions"></div>
+      </section>
+
+      <div class="two-column">
+        <section class="panel" aria-labelledby="trace-heading">
+          <div class="section-heading compact"><div><p class="step">03 / EVIDENCE</p><h2 id="trace-heading">Workflow trace</h2></div></div>
+          <div class="legend">
+            <span class="success">SUCCESS</span><span class="continued">CONTINUED</span>
+            <span class="recovered">RECOVERED</span><span class="terminal">TERMINAL</span>
+          </div>
+          <ol id="event-list" class="timeline"></ol>
+        </section>
+        <section class="panel" aria-labelledby="artifacts-heading">
+          <div class="section-heading compact"><div><p class="step">04 / ARTIFACTS</p><h2 id="artifacts-heading">Stage artifacts</h2></div></div>
+          <div id="artifact-list" class="stack"></div>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="tools-heading">
+        <div class="section-heading">
+          <div><p class="step">05 / AGENT</p><h2 id="tools-heading">Investigator tool history</h2></div>
+          <p id="investigator-label">No investigation has run.</p>
+        </div>
+        <div id="tool-list" class="tool-flow"></div>
+      </section>
+
+      <div class="two-column">
+        <section class="panel" aria-labelledby="report-heading">
+          <div class="section-heading compact"><div><p class="step">06 / DIAGNOSIS</p><h2 id="report-heading">Investigation report</h2></div></div>
+          <div id="report" class="empty">Run an investigation to produce an evidence-grounded report.</div>
+        </section>
+        <section class="panel policy-panel" aria-labelledby="policy-heading">
+          <div class="section-heading compact"><div><p class="step">07 / SAFETY</p><h2 id="policy-heading">Policy &amp; controlled recovery</h2></div></div>
+          <div id="policy" class="empty">Deterministic policy has not evaluated a recommendation.</div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
