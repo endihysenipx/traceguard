@@ -315,6 +315,43 @@ def test_stale_attempt_limit_blocks_authorized_retry_without_side_effect():
     assert erp.calls == 0
 
 
+def test_attempt_change_during_backoff_is_blocked_before_erp_side_effect():
+    run, repository, _ = _failed_fixture(PresetId.ERP_UNAVAILABLE)
+    _scripted_investigation(run.run_id, repository)
+    erp = CountingErp()
+    slept = []
+
+    def concurrent_attempt_during_backoff(seconds: float) -> None:
+        slept.append(seconds)
+        repository.record_erp_attempt(
+            run.run_id,
+            behavior=MockErpBehavior.FAIL_ONCE_503,
+            status_code=503,
+            succeeded=False,
+            response_summary="Concurrent attempt consumed the final allowed slot.",
+        )
+
+    result = RecoveryCoordinator(
+        repository,
+        erp,
+        sleeper=concurrent_attempt_during_backoff,
+    ).recover(run.run_id)
+
+    final = repository.get_run(run.run_id)
+    assert slept == [1.0]
+    assert erp.calls == 0
+    assert final.erp_attempt_count == 2
+    assert result.execution.status is RecoveryExecutionStatus.BLOCKED
+    assert final.recovery_state is RecoveryState.BLOCK
+    assert final.workflow_state is WorkflowState.FAILED
+    assert final.investigation_state is InvestigationState.COMPLETED
+    assert final.canonical_failure_code is CanonicalErrorCode.ERP_UNAVAILABLE
+    assert [record.status for record in repository.list_recovery_executions(run.run_id)] == [
+        RecoveryExecutionStatus.STARTED,
+        RecoveryExecutionStatus.BLOCKED,
+    ]
+
+
 def test_malformed_latest_validated_order_artifact_fails_closed():
     run, repository, _ = _failed_fixture(PresetId.ERP_UNAVAILABLE)
     _scripted_investigation(run.run_id, repository)

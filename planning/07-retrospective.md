@@ -15,11 +15,13 @@
 - The mock ERP initially generated the optional-field warning solely from simulation mode and ignored the actual validated order, which could create false trace evidence for edited or custom inputs.
 - The coding agent initially made all Pydantic tool-argument models globally strict, which rejected valid JSON string representations of UUIDs and enum values. Focused tests exposed the mismatch, and the schemas were corrected while retaining extra-field rejection and explicit enum/limit validation.
 - A Phase 4 test initially used pytest's reserved `request` fixture name as a parametrized argument, causing collection to fail until the argument was renamed.
+- The Phase 5 recovery coordinator initially performed its final current-state authorization check before the policy backoff, leaving a window where the ERP attempt count could change before the actual side effect.
 
 ## Human Corrections and Overrides
 
 - Human review identified the semantic inconsistency and required all missing required-input failures to use the same `REQUIRE_REVIEW` behavior for correction or human-review recommendations.
 - Human review required diagnostic events to remain grounded in actual run data because the investigator will later use those events as evidence.
+- Human review identified the stale-authorization window and required a second current-state/policy guard after backoff immediately before ERP submission, with `ALLOW` transitioning safely to `BLOCK` if authorization became stale.
 
 ## Debugging Episodes
 

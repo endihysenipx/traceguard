@@ -161,9 +161,33 @@ class RecoveryCoordinator:
                 idempotent_replay=True,
             )
 
-        self._repository.transition_recovery(run_id, RecoveryState.RETRYING)
         try:
             self._sleeper(float(decision.constraints.backoff_seconds))
+        except Exception:
+            return self._complete_claim_as_blocked(
+                run_id,
+                decision,
+                execution,
+                "The policy backoff failed before ERP execution.",
+            )
+
+        current_run, current_report = self._load_eligible_run_and_report(run_id)
+        stale_reason = self._authorization_problem(
+            current_run,
+            current_report,
+            decision,
+            expected_execution_id=execution.execution_id,
+        )
+        if stale_reason is not None:
+            return self._complete_claim_as_blocked(
+                run_id,
+                decision,
+                execution,
+                stale_reason,
+            )
+
+        self._repository.transition_recovery(run_id, RecoveryState.RETRYING)
+        try:
             erp_result = self._erp.submit(run_id, order)
         except Exception:
             completed = self._repository.complete_recovery_execution(
@@ -203,6 +227,8 @@ class RecoveryCoordinator:
         run: WorkflowRun,
         report: InvestigationReport,
         decision: RecoveryDecisionRecord,
+        *,
+        expected_execution_id: UUID | None = None,
     ) -> str | None:
         decisions = self._repository.list_recovery_decisions(run.run_id)
         if not decisions or decisions[-1].decision_record_id != decision.decision_record_id:
@@ -227,9 +253,34 @@ class RecoveryCoordinator:
             or current_output.constraints != stored.constraints
         ):
             return "Current repository state no longer satisfies retry policy."
-        if self._existing_execution(run.run_id, run.idempotency_key) is not None:
-            return "The idempotency key already has a recovery execution."
+        existing = self._existing_execution(run.run_id, run.idempotency_key)
+        if expected_execution_id is None:
+            if existing is not None:
+                return "The idempotency key already has a recovery execution."
+        elif (
+            existing is None
+            or existing.execution_id != expected_execution_id
+            or existing.status is not RecoveryExecutionStatus.STARTED
+        ):
+            return "The active idempotency claim no longer matches this execution."
         return None
+
+    def _complete_claim_as_blocked(
+        self,
+        run_id: UUID,
+        decision: RecoveryDecisionRecord,
+        execution: RecoveryExecutionRecord,
+        summary: str,
+    ) -> RecoveryResult:
+        completed = self._repository.complete_recovery_execution(
+            run_id,
+            execution_id=execution.execution_id,
+            status=RecoveryExecutionStatus.BLOCKED,
+            erp_attempt_number=None,
+            result_summary=summary,
+        )
+        self._repository.transition_recovery(run_id, RecoveryState.BLOCK)
+        return RecoveryResult(decision=decision, execution=completed)
 
     def _block_execution(
         self,

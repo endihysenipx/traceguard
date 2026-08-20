@@ -11,7 +11,7 @@
 - Implemented a deterministic recovery coordinator that constructs policy input from stored workflow/report facts, persists append-only decisions, and executes only a policy-authorized same-input ERP retry.
 - Implemented append-only recovery execution lifecycle records, repository-level idempotency claims, current-state policy re-evaluation, a policy-provided backoff seam, and terminal `RECOVERED`/`RETRY_EXHAUSTED` outcomes without rewriting the failed workflow.
 - Added minimal OpenAI dependency/environment declarations and a credential-gated live smoke entry point.
-- Added 146 focused unit and integration-style tests; the latest full run passed in 1.83 seconds with no network or API key.
+- Added 147 focused unit and integration-style tests; the latest full run passed in 1.88 seconds with no network or API key.
 - No FastAPI endpoint, UI, deployment configuration, or final README work exists yet.
 
 ## Approved Architecture
@@ -87,7 +87,8 @@ After explicit approval, implement Phase 6 only: assemble the FastAPI routes and
 
 - `RecoveryCoordinator.recover(run_id)` accepts no caller-supplied action or canonical facts. It loads the failed run and completed stored report, builds `PolicyInput`, and delegates authorization to the existing `evaluate_recovery_policy()` function.
 - Policy decision records are append-only and retain report ID, decision, allowed action, reason codes, and constraints. Recovery execution history is also append-only: an atomic `STARTED` claim for the run/idempotency key precedes any side effect, followed by `SUCCEEDED`, `FAILED`, or `BLOCKED`.
-- Before the ERP call, the coordinator reloads repository state, verifies the current stored `ALLOW` decision/report/action/key/limits, and re-evaluates policy with the current attempt count. Stale or inconsistent authorization fails closed.
+- The coordinator validates authorization both before claiming execution and again after the policy backoff immediately before the side effect. The final guard reloads the run/report, verifies the current stored `ALLOW` decision/action/key/constraints and active claim, re-evaluates policy with the latest attempt count, and fails closed if state changed.
+- Retry ordering is `ALLOW` -> atomic `STARTED` claim -> policy backoff -> final authorization guard -> `RETRYING` -> ERP submit. A stale post-backoff authorization completes the claim as `BLOCKED` and uses the legal `ALLOW` -> `BLOCK` transition without an ERP call.
 - The retry reconstructs a strict `ValidatedOrder` from the successful business-validation artifact. It does not rerun extraction, validation, or investigation, and it never edits submitted input.
 - The authorized `FAIL_ONCE_503` retry honors the policy's one-second backoff and succeeds as total ERP attempt 2. Duplicate calls return the recorded execution and cannot create attempt 3.
 - Retry failure transitions only recovery state to `RETRY_EXHAUSTED`; workflow state, canonical failure, original events, investigation report, and tool history remain intact.
