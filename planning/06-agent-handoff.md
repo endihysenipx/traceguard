@@ -6,7 +6,7 @@
 - Deterministic domain-core and Phase 2 workflow/trace phases are complete.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
 - Implemented the protocol-backed in-memory trace repository, append-only events/artifacts, four editable fixtures, deterministic workflow orchestrator, and stateful mock ERP.
-- Added 77 focused unit and integration-style tests; the latest full run passed in 0.24 seconds.
+- Added 78 focused unit and integration-style tests; the latest full run passed in 0.80 seconds.
 - No live/scripted LLM provider, investigator loop, diagnostic tools, runbook retrieval, controlled recovery execution, FastAPI endpoint, UI, or deployment configuration exists yet.
 
 ## Approved Architecture
@@ -51,7 +51,7 @@ After explicit approval, implement Phase 3 only: the shared extraction-provider 
 - Repository event and artifact histories are append-only; collection reads return tuples and artifact reads are deep copies.
 - The orchestrator receives an injected extraction callable and reuses every Phase 1 validation boundary. It never branches on `preset_id`.
 - Failed runs retain their complete trace and enter investigation state `PENDING`; successful runs retain no failure facts.
-- `FAIL_ONCE_503` records the optional-field warning, recovered cache failure, successful fallback, and terminal ERP 503 in order. A direct adapter-level second attempt succeeds, but no recovery execution path exists.
+- `FAIL_ONCE_503` records the optional-field warning only when validated delivery instructions are absent, then records the recovered cache failure, successful fallback, and terminal ERP 503 in order. The fixture retains the full noisy sequence; a direct adapter-level second attempt succeeds, but no recovery execution path exists.
 - Phase 2 introduced no architectural deviation from the approved plan.
 
 ## Constraints That Must Not Be Violated

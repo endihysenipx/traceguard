@@ -161,6 +161,46 @@ def test_erp_unavailable_records_noise_then_terminal_503() -> None:
     assert run.canonical_failure_code is not CanonicalErrorCode.ERP_REJECTED
 
 
+def test_erp_noise_uses_actual_order_facts_not_preset_identity() -> None:
+    repository = InMemoryTraceRepository()
+    erp = MockErp(repository)
+    run = WorkflowOrchestrator(repository, erp).execute(
+        order_request_text=(
+            "Edited request for CUST-3003 with explicit delivery instructions."
+        ),
+        preset_id=PresetId.ERP_UNAVAILABLE,
+        mock_erp_behavior=MockErpBehavior.FAIL_ONCE_503,
+        extraction=lambda _: {
+            "customer_number": "CUST-3003",
+            "product_code": "SKU-PUMP-9",
+            "quantity": 6,
+            "delivery_instructions": "Deliver to loading bay 4.",
+        },
+    )
+
+    event_types = [
+        event.event_type for event in repository.list_events(run.run_id)
+    ]
+    assert EventType.OPTIONAL_FIELD_DEFAULTED not in event_types
+    relevant_types = {
+        EventType.CACHE_LOOKUP_FAILED,
+        EventType.CACHE_FALLBACK_SUCCEEDED,
+        EventType.ERP_REQUEST_FAILED,
+    }
+    assert [event_type for event_type in event_types if event_type in relevant_types] == [
+        EventType.CACHE_LOOKUP_FAILED,
+        EventType.CACHE_FALLBACK_SUCCEEDED,
+        EventType.ERP_REQUEST_FAILED,
+    ]
+    assert run.workflow_state is WorkflowState.FAILED
+    assert run.failure_stage is WorkflowState.ERP_CALLING
+    assert run.canonical_failure_code is CanonicalErrorCode.ERP_UNAVAILABLE
+    assert (
+        run.canonical_failure_category
+        is FailureCategory.EXTERNAL_TRANSIENT_FAILURE
+    )
+
+
 def test_fail_once_mock_erp_would_succeed_on_second_total_attempt() -> None:
     run, repository, erp = execute_fixture(
         SCENARIO_FIXTURES[PresetId.ERP_UNAVAILABLE]
@@ -255,4 +295,3 @@ def test_structural_failure_uses_existing_phase_one_validation_boundary() -> Non
         run.canonical_failure_category
         is FailureCategory.STRUCTURAL_VALIDATION_FAILURE
     )
-

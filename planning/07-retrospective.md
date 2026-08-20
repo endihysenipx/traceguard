@@ -9,10 +9,12 @@
 ## Where the Coding Agent Failed or Made Poor Assumptions
 
 - Adding explicit `PRODUCT_CODE_MISSING` and `QUANTITY_MISSING` canonical errors was useful, but the coding agent initially left their recovery-policy consequences inconsistent with `CUSTOMER_NUMBER_MISSING`.
+- The mock ERP initially generated the optional-field warning solely from simulation mode and ignored the actual validated order, which could create false trace evidence for edited or custom inputs.
 
 ## Human Corrections and Overrides
 
 - Human review identified the semantic inconsistency and required all missing required-input failures to use the same `REQUIRE_REVIEW` behavior for correction or human-review recommendations.
+- Human review required diagnostic events to remain grounded in actual run data because the investigator will later use those events as evidence.
 
 ## Debugging Episodes
 
