@@ -3,8 +3,10 @@
 ## Current State
 
 - Architecture and scope are approved.
-- Only planning artifacts exist; no backend, frontend, tests, configuration, or application code has been created.
-- The repository began empty.
+- Deterministic domain-core phase is complete.
+- Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
+- Added 53 focused unit tests; the final run passed in 0.14 seconds.
+- No workflow repository/orchestrator, LLM provider, investigator loop, tools, runbook retrieval, mock ERP, FastAPI endpoint, UI, integration test, or deployment configuration exists yet.
 
 ## Approved Architecture
 
@@ -32,7 +34,14 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 
 ## Next Implementation Task
 
-Implement the deterministic domain core first: enums, Pydantic contracts, separated validation functions, state-transition rules, and recovery-policy matrix, with focused unit tests. Do not begin with FastAPI routes, UI, live LLM integration, or persistence.
+After explicit approval, implement Phase 2 only: the in-memory trace repository, append-only event contracts, four editable fixture definitions, workflow orchestration, and stateful mock ERP with the intentionally noisy fail-once-503 trace. Do not begin the LLM, investigator, retrieval, API, or UI layers as part of that task.
+
+## Phase 1 Implementation Notes
+
+- Added `PRODUCT_CODE_MISSING` and `QUANTITY_MISSING` alongside the planned core codes so every required field has an explicit deterministic domain error.
+- `PolicyInput` permits absent diagnosed fields only so malformed or unavailable investigation output can be represented without invented values; policy returns `BLOCK` with `INVALID_INVESTIGATION`.
+- Policy checks both diagnosed code and diagnosed category against the deterministic canonical mapping before considering an action.
+- These are contract refinements, not changes to the approved responsibility or recovery boundaries.
 
 ## Constraints That Must Not Be Violated
 
