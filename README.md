@@ -191,8 +191,8 @@ Copying `.env.example` is optional, but the application does **not** load `.env`
 | Variable | Behavior |
 |---|---|
 | `OPENAI_API_KEY` | Required for LIVE extraction or investigation. Never commit it. |
-| `TRACEGUARD_OPENAI_MODEL` | Extraction model; defaults to `gpt-5.4-nano`. Also supplies the investigator fallback model. |
-| `TRACEGUARD_OPENAI_INVESTIGATOR_MODEL` | Optional investigator-specific override; falls back to `TRACEGUARD_OPENAI_MODEL`, then `gpt-5.4-nano`. |
+| `TRACEGUARD_OPENAI_MODEL` | Extraction model; defaults to `gpt-5.4-nano`. |
+| `TRACEGUARD_OPENAI_INVESTIGATOR_MODEL` | Investigator model; defaults independently to `gpt-5.4-mini`. |
 
 The live adapters use the official OpenAI Python SDK and Responses API with strict structured output, bounded timeouts, and `store=False`. There is no silent fallback to SCRIPTED.
 
@@ -202,7 +202,7 @@ The live adapters use the official OpenAI Python SDK and Responses API with stri
 python -m pytest -q
 ```
 
-Latest complete Phase 7 verification: **168 passed in 2.63s**.
+Latest complete Phase 7 verification: **172 passed in 2.69s**.
 
 The default suite is deterministic, API-key-free, and makes zero OpenAI network calls. Fake clients exercise provider requests, tool calls, refusals, timeouts, malformed output, sanitization, budgets, and policy conflicts.
 
@@ -217,7 +217,20 @@ python -m traceguard.investigation.live_smoke
 
 With no `OPENAI_API_KEY`, each prints a clear `SKIPPED` result and makes no external call. A skipped result is not proof that the LIVE path executed.
 
-Phase 7 result in the coding-agent environment: both commands skipped cleanly because no API key was available. **No genuine external OpenAI call was made.**
+The investigator smoke prints its selected model, actual stored tool names/count, and either
+`COMPLETED` or `SAFE_FAILURE: <reason>`. Safe failures exit non-zero without an automatic
+retry and do not print an unhandled traceback.
+
+Both LIVE paths have now been exercised against the real OpenAI API. LIVE extraction
+succeeded. The first LIVE investigation exposed a `MODEL_TURN_LIMIT` integration defect
+caused by disabled parallel function calls. After bounded parallel calls were enabled, one
+real report was rejected as `REPORT_NOT_GROUNDED`, demonstrating deterministic fail-closed
+evidence validation. A subsequent `gpt-5.4-mini` run completed successfully with four real
+read-only tool calls in the intended 2 + 2 + structured-report flow.
+
+These observations verify the integration path, not guaranteed completion of every model
+invocation. Model output varies; refused, malformed, over-budget, or ungrounded results are
+designed to fail closed.
 
 ## 2-4 minute scripted walkthrough
 
@@ -264,7 +277,8 @@ Prompt injection is not claimed to be solved. Its blast radius is constrained be
 - Tiny tagged local runbook and a small controlled failure taxonomy.
 - One automatic recovery action only.
 - SCRIPTED extraction is limited to exact fixtures.
-- LIVE paths require credentials and remain externally unverified in this environment.
+- LIVE paths require credentials and model output remains variable. Both paths have been
+  verified against the real API, including one safely rejected ungrounded investigation.
 - No authentication, real ERP, distributed workers, queues, or production database.
 - No hosted deployment.
 - Visual browser QA was not completed in the coding-agent environment, although local HTTP page/API and scripted-flow verification succeeded.
@@ -284,6 +298,7 @@ A coding agent was used heavily for planning, implementation, test generation, r
 - placing `ProviderMode` in the workflow package created an import cycle;
 - globally strict tool-argument schemas initially rejected valid JSON UUID and enum strings;
 - human review identified a stale-authorization window during recovery backoff and required a final guard immediately before ERP submission.
+- a genuine LIVE investigation smoke exposed that disabling parallel tool calls was incompatible with the approved three-turn evidence-gathering strategy.
 
 AI accelerated the build, but passing tests alone did not guarantee semantic consistency or safe side-effect timing.
 

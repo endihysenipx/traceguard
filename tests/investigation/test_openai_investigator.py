@@ -6,12 +6,17 @@ import pytest
 
 from traceguard.domain.enums import (
     CanonicalErrorCode,
+    InvestigationFailureReason,
     InvestigationState,
     RecoveryAction,
     RecoveryState,
     ProviderMode,
 )
-from traceguard.investigation import Investigator, LocalRunbook
+from traceguard.investigation import (
+    InvestigationFailedError,
+    Investigator,
+    LocalRunbook,
+)
 from traceguard.investigation.models import (
     InvestigationStartContext,
     InvestigatorModelError,
@@ -20,6 +25,7 @@ from traceguard.investigation.models import (
     ToolCallResult,
 )
 from traceguard.investigation.openai_model import (
+    DEFAULT_OPENAI_INVESTIGATOR_MODEL,
     INVESTIGATOR_INSTRUCTIONS,
     OpenAIInvestigatorModel,
 )
@@ -36,7 +42,10 @@ class FakeResponses:
         self.calls: list[dict[str, object]] = []
 
     def parse(self, **kwargs: object) -> object:
-        self.calls.append(kwargs)
+        recorded = dict(kwargs)
+        if isinstance(kwargs.get("input"), list):
+            recorded["input"] = list(kwargs["input"])
+        self.calls.append(recorded)
         if self.error is not None:
             raise self.error
         return self.responses.pop(0)
@@ -60,14 +69,21 @@ def response(*, output=(), report=None):
     return SimpleNamespace(output=list(output), output_parsed=report)
 
 
-def test_live_adapter_sends_bounded_secure_responses_request_and_tool_output() -> None:
+def test_live_adapter_enables_parallel_calls_and_replays_multiple_tool_outputs() -> None:
     run, repository = execute_fixture(PresetId.ERP_UNAVAILABLE)
-    call = function_call(
-        "events-call",
-        "get_run_events",
-        {"run_id": str(run.run_id), "stage": None, "limit": 20},
-    )
-    client = FakeClient([response(output=[call])])
+    calls = [
+        function_call(
+            "overview-call",
+            "get_run_overview",
+            {"run_id": str(run.run_id)},
+        ),
+        function_call(
+            "events-call",
+            "get_run_events",
+            {"run_id": str(run.run_id), "stage": None, "limit": 20},
+        ),
+    ]
+    client = FakeClient([response(output=calls)])
     model = OpenAIInvestigatorModel(
         client=client, model="configured-investigator", timeout_seconds=8
     )
@@ -83,6 +99,11 @@ def test_live_adapter_sends_bounded_secure_responses_request_and_tool_output() -
     model.submit_tool_results(
         (
             ToolCallResult(
+                provider_call_id="overview-call",
+                name="get_run_overview",
+                output={"workflow_state": "FAILED"},
+            ),
+            ToolCallResult(
                 provider_call_id="events-call",
                 name="get_run_events",
                 output={"events": []},
@@ -94,15 +115,24 @@ def test_live_adapter_sends_bounded_secure_responses_request_and_tool_output() -
     assert request["model"] == "configured-investigator"
     assert request["instructions"] == INVESTIGATOR_INSTRUCTIONS
     assert request["store"] is False
-    assert request["parallel_tool_calls"] is False
+    assert request["parallel_tool_calls"] is True
     assert request["timeout"] == 8
     assert len(request["tools"]) == 4
     initial_text = request["input"][0]["content"]
     assert str(run.run_id) in initial_text
     assert run.canonical_failure_code.value not in initial_text
     assert EventType.ERP_REQUEST_FAILED.value not in initial_text
-    assert turn.tool_calls[0].arguments["run_id"] == str(run.run_id)
-    assert model._input_items[-1]["type"] == "function_call_output"
+    assert len(turn.tool_calls) == 2
+    assert all(call.arguments["run_id"] == str(run.run_id) for call in turn.tool_calls)
+    replayed = [
+        item
+        for item in model._input_items
+        if isinstance(item, dict) and item.get("type") == "function_call_output"
+    ]
+    assert [item["call_id"] for item in replayed] == [
+        "overview-call",
+        "events-call",
+    ]
 
 
 def test_live_openai_path_runs_real_bounded_loop_with_fake_client() -> None:
@@ -152,6 +182,22 @@ def test_live_openai_path_runs_real_bounded_loop_with_fake_client() -> None:
 
     assert completed.report_id == report.report_id
     assert len(client.responses.calls) == 3
+    assert all(
+        request["parallel_tool_calls"] is True
+        for request in client.responses.calls
+    )
+    second_turn_inputs = client.responses.calls[1]["input"]
+    assert [
+        item["call_id"]
+        for item in second_turn_inputs
+        if isinstance(item, dict) and item.get("type") == "function_call_output"
+    ] == ["overview", "events"]
+    third_turn_inputs = client.responses.calls[2]["input"]
+    assert [
+        item["call_id"]
+        for item in third_turn_inputs
+        if isinstance(item, dict) and item.get("type") == "function_call_output"
+    ] == ["overview", "events", "artifact", "runbook"]
     assert [call.tool_name for call in repository.list_investigation_tool_calls(run.run_id)] == [
         "get_run_overview",
         "get_run_events",
@@ -164,11 +210,34 @@ def test_live_openai_path_runs_real_bounded_loop_with_fake_client() -> None:
     assert final.recovery_state is RecoveryState.NONE
 
 
-def test_investigator_specific_model_override_falls_back_cleanly(monkeypatch) -> None:
+def test_live_parallel_batch_over_six_calls_fails_before_tool_execution() -> None:
+    run, repository = execute_fixture(PresetId.ERP_UNAVAILABLE)
+    calls = [
+        function_call(
+            f"overview-{index}",
+            "get_run_overview",
+            {"run_id": str(run.run_id)},
+        )
+        for index in range(7)
+    ]
+    client = FakeClient([response(output=calls)])
+
+    with pytest.raises(InvestigationFailedError) as raised:
+        Investigator(repository, LocalRunbook()).investigate(
+            run.run_id, OpenAIInvestigatorModel(client=client)
+        )
+
+    assert raised.value.reason is InvestigationFailureReason.TOOL_CALL_LIMIT
+    assert len(client.responses.calls) == 1
+    assert repository.list_investigation_tool_calls(run.run_id) == ()
+
+
+def test_investigator_uses_own_default_and_specific_override(monkeypatch) -> None:
     monkeypatch.setenv("TRACEGUARD_OPENAI_MODEL", "shared-model")
     monkeypatch.delenv("TRACEGUARD_OPENAI_INVESTIGATOR_MODEL", raising=False)
-    shared = OpenAIInvestigatorModel(client=FakeClient())
-    assert shared.model == "shared-model"
+    default = OpenAIInvestigatorModel(client=FakeClient())
+    assert default.model == DEFAULT_OPENAI_INVESTIGATOR_MODEL
+    assert default.model == "gpt-5.4-mini"
 
     monkeypatch.setenv("TRACEGUARD_OPENAI_INVESTIGATOR_MODEL", "investigator-model")
     specific = OpenAIInvestigatorModel(client=FakeClient())

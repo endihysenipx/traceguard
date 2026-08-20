@@ -13,7 +13,7 @@
 - Implemented one FastAPI composition root with a process-local repository/service graph, closed JSON request contracts, safe error mapping, six focused API operations, and one static HTML/CSS/vanilla-JavaScript page.
 - Implemented human-facing aggregate inspection of run facts, chronological trace/artifacts, actual tool history, evidence-grounded report, deterministic policy decisions, and controlled recovery records.
 - Added minimal OpenAI dependency/environment declarations and a credential-gated live smoke entry point.
-- Added 168 focused unit and integration-style tests; the final Phase 7 run passed in 2.63 seconds with no network or API key.
+- Added 169 focused unit and integration-style tests; the final model-alignment run passed in 2.80 seconds with no network or API key.
 - Added the final root README with reproducible setup, architecture and safety boundaries, scripted/live distinctions, scenario walkthroughs, smoke commands, limitations, and assessment-development retrospective.
 - Repository hygiene verification found no tracked cache, virtual-environment, `.env`, or compiled Python artifacts. Secret-like values found by the bounded pattern scan are deliberate fake sanitization inputs in tests.
 - No deployment configuration was added.
@@ -49,7 +49,7 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 - Implementation is complete for the approved assessment scope; there is no next implementation phase.
 - Startup entry point: `python -m uvicorn traceguard.api.app:app --reload`.
 - Full verification command: `python -m pytest -q`.
-- Both credential-gated smoke entry points were run in Phase 7 and skipped cleanly because `OPENAI_API_KEY` was unavailable. No genuine external OpenAI call was made.
+- Genuine external smoke testing verified LIVE extraction and the corrected LIVE investigator. Investigation first exposed `MODEL_TURN_LIMIT` with parallel calls disabled, then safely rejected one `REPORT_NOT_GROUNDED` result, and subsequently completed with `gpt-5.4-mini` using four read-only calls across the intended 2 + 2 + report flow.
 - The reproducible SCRIPTED demo requires no credentials. LIVE extraction and investigation require runtime credentials and never fall back to SCRIPTED.
 - Known limitations remain intentional: in-memory/process-local state and idempotency, a tiny runbook and taxonomy, one automatic recovery action, no authentication or production ERP, no durable crash reconciliation, no deployment, and no completed visual browser QA in the coding-agent environment.
 
@@ -75,7 +75,7 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 - `ExtractionProvider.extract(order_request_text)` is the production-facing boundary; the orchestrator passes submitted text unchanged and always invokes deterministic structural validation on the returned object.
 - `ScriptedExtractionProvider` matches only the four exact fixture request texts, returns defensive JSON-compatible dictionaries, and raises `UnsupportedScriptedInputError` for edited or custom text.
 - `OpenAIExtractionProvider` uses the official Python SDK's Responses API `responses.parse` method with a strict four-field Pydantic response schema, `store=False`, a 256-token output cap, and a bounded per-request timeout.
-- The default live model is `gpt-5.4-nano`; `TRACEGUARD_OPENAI_MODEL` overrides it and `OPENAI_API_KEY` is required without fallback.
+- The default live extraction model is `gpt-5.4-nano`; `TRACEGUARD_OPENAI_MODEL` overrides it and `OPENAI_API_KEY` is required without fallback.
 - Provider configuration, timeout, request, refusal, and malformed-output failures use sanitized exceptions. Workflow logic collapses all provider failures to deterministic `EXTRACTION_MODEL_ERROR` without retaining raw provider details.
 - Provider mode is retained as run metadata. Moving this cross-cutting enum to the domain enum module resolved an initial package import cycle without changing the approved responsibility boundaries.
 - The credential-gated smoke entry point was executed locally and skipped cleanly because no API key was present; no real live call has yet been verified.
@@ -88,9 +88,9 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 - Evidence items now carry `TERMINAL_CAUSE`, `SUPPORTING`, or `NON_CAUSAL_CONTEXT`. Validation requires causal terminal evidence, target-run ownership, prior retrieval through `get_run_events`, and prior retrieval of cited runbook IDs. It deliberately does not compare diagnosis to the hidden canonical workflow error.
 - Tool-call records are append-only and include sequence, validated/sanitized arguments, success/failure, and bounded results. Investigation reports and sanitized failures are additive; workflow events, artifacts, canonical failure facts, ERP attempts, and recovery state remain unchanged.
 - `ScriptedInvestigatorModel` is explicitly deterministic/non-AI but executes the real tools and derives reports from returned events, artifacts, and runbook results without using `preset_id`.
-- `OpenAIInvestigatorModel` uses the official Responses API `responses.parse` tool loop with strict function schemas, structured `InvestigationReport`, `store=False`, disabled parallel calls, a bounded timeout, and stateless replay of response items plus function outputs.
-- Runs retain separate extraction and investigation provider-mode metadata. `TRACEGUARD_OPENAI_INVESTIGATOR_MODEL` overrides the shared model setting when present.
-- The live investigator smoke entry point skipped cleanly because no API key was available; the external live investigator remains unverified locally.
+- `OpenAIInvestigatorModel` uses the official Responses API `responses.parse` tool loop with strict function schemas, structured `InvestigationReport`, `store=False`, bounded parallel calls, a bounded timeout, and stateless replay of response items plus function outputs.
+- Runs retain separate extraction and investigation provider-mode metadata. The investigator defaults independently to `gpt-5.4-mini`; `TRACEGUARD_OPENAI_INVESTIGATOR_MODEL` overrides it and the extraction model setting does not.
+- Genuine post-fix smoke testing completed with four real read-only calls across the intended 2 + 2 + report flow. A prior `REPORT_NOT_GROUNDED` result was rejected safely, confirming model variability is contained by deterministic grounding validation.
 
 ## Phase 5 Implementation Notes
 
@@ -119,7 +119,8 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 
 - The untouched baseline suite passed with 168 tests in 2.49 seconds before documentation changes.
 - The complete post-documentation suite passed with 168 tests in 2.63 seconds.
-- Both existing LIVE smoke entry points skipped cleanly because no API key was configured; this is recorded as an external-verification limitation, not a successful LIVE call.
+- After the genuine LIVE investigator finding, the focused adapter fix, model-default alignment, and regression coverage left the complete network-free suite at 169 passing tests in 2.80 seconds.
+- Subsequent human-run smokes with a real key verified extraction and exposed the investigator turn-limit defect. After correction, one ungrounded report failed closed and a later `gpt-5.4-mini` investigation completed with four real tool calls in the intended three-turn flow.
 - The repository audit checked tracked paths, retired terminology, obvious API-key patterns, stale LIVE-verification claims, generated Python artifacts, and local environment files.
 - The architecture document was corrected to match implementation: recovery uses separate additive attempt/execution records rather than adding workflow events, all missing required fields have explicit canonical codes, and malformed investigation output fails safely without an automatic model retry.
 - The root README now provides the assessor-facing architecture, setup, test, demo, safety, tradeoff, and coding-agent review narrative.
