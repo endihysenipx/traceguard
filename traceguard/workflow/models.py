@@ -10,6 +10,7 @@ from traceguard.domain.enums import (
     CanonicalErrorCode,
     EventOutcome,
     FailureCategory,
+    InvestigationFailureReason,
     InvestigationState,
     ProviderMode,
     RecoveryState,
@@ -72,6 +73,7 @@ class WorkflowRun(DomainModel):
     preset_id: PresetId | None = None
     mock_erp_behavior: MockErpBehavior
     extraction_provider_mode: ProviderMode | None = None
+    investigation_provider_mode: ProviderMode | None = None
     workflow_state: WorkflowState = WorkflowState.CREATED
     investigation_state: InvestigationState = InvestigationState.NOT_REQUIRED
     recovery_state: RecoveryState = RecoveryState.NONE
@@ -124,3 +126,23 @@ class ErpDiagnostic(DomainModel):
 class MockErpResult(DomainModel):
     attempt: ErpAttempt
     diagnostics: tuple[ErpDiagnostic, ...] = ()
+
+
+class InvestigationToolCall(DomainModel):
+    call_id: UUID = Field(default_factory=uuid4)
+    timestamp: datetime = Field(default_factory=utc_now)
+    run_id: UUID
+    sequence_number: int = Field(ge=1)
+    tool_name: str = Field(min_length=1, max_length=80)
+    arguments: dict[str, JsonValue]
+    succeeded: bool
+    result: JsonValue | None = None
+    failure_reason: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class InvestigationFailure(DomainModel):
+    failure_id: UUID = Field(default_factory=uuid4)
+    timestamp: datetime = Field(default_factory=utc_now)
+    run_id: UUID
+    reason: InvestigationFailureReason
+    details: str = Field(min_length=1, max_length=240)

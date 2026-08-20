@@ -6,6 +6,8 @@ from traceguard.workflow.models import (
     ErpAttempt,
     EventSeverity,
     EventType,
+    InvestigationFailure,
+    InvestigationToolCall,
     MockErpBehavior,
     PresetId,
     ProviderMode,
@@ -18,6 +20,7 @@ from traceguard.workflow.orchestrator import WorkflowOrchestrator
 from traceguard.workflow.repository import (
     ArtifactNotFoundError,
     InMemoryTraceRepository,
+    InvestigationRecordNotFoundError,
     RunNotFoundError,
     TraceRepository,
 )
@@ -28,6 +31,9 @@ __all__ = [
     "EventSeverity",
     "EventType",
     "InMemoryTraceRepository",
+    "InvestigationFailure",
+    "InvestigationRecordNotFoundError",
+    "InvestigationToolCall",
     "MockErp",
     "MockErpBehavior",
     "PresetId",

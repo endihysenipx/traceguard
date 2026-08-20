@@ -10,14 +10,18 @@ from traceguard.domain.enums import (
     CanonicalErrorCode,
     FailureCategory,
     InvestigationState,
+    ProviderMode,
     WorkflowState,
 )
+from traceguard.domain.models import InvestigationReport
 from traceguard.domain.transitions import (
     ensure_investigation_transition,
     ensure_workflow_transition,
 )
 from traceguard.workflow.models import (
     ErpAttempt,
+    InvestigationFailure,
+    InvestigationToolCall,
     MockErpBehavior,
     StageArtifact,
     StageArtifactType,
@@ -73,6 +77,34 @@ class TraceRepository(Protocol):
 
     def list_erp_attempts(self, run_id: UUID) -> Sequence[ErpAttempt]: ...
 
+    def transition_investigation(
+        self,
+        run_id: UUID,
+        target: InvestigationState,
+        *,
+        provider_mode: ProviderMode | None = None,
+    ) -> WorkflowRun: ...
+
+    def append_investigation_tool_call(
+        self, call: InvestigationToolCall
+    ) -> InvestigationToolCall: ...
+
+    def list_investigation_tool_calls(
+        self, run_id: UUID
+    ) -> Sequence[InvestigationToolCall]: ...
+
+    def complete_investigation(
+        self, report: InvestigationReport
+    ) -> WorkflowRun: ...
+
+    def get_investigation_report(self, run_id: UUID) -> InvestigationReport: ...
+
+    def fail_investigation(
+        self, failure: InvestigationFailure
+    ) -> WorkflowRun: ...
+
+    def get_investigation_failure(self, run_id: UUID) -> InvestigationFailure: ...
+
 
 class TraceRepositoryError(RuntimeError):
     """Base error for explicit repository failures."""
@@ -94,6 +126,10 @@ class DuplicateTraceRecordError(TraceRepositoryError):
     pass
 
 
+class InvestigationRecordNotFoundError(TraceRepositoryError):
+    pass
+
+
 class InMemoryTraceRepository:
     """Thread-safe process-local storage; intentionally not production persistence."""
 
@@ -102,8 +138,12 @@ class InMemoryTraceRepository:
         self._events: dict[UUID, list[TraceEvent]] = {}
         self._artifacts: dict[UUID, list[StageArtifact]] = {}
         self._erp_attempts: dict[UUID, list[ErpAttempt]] = {}
+        self._investigation_calls: dict[UUID, list[InvestigationToolCall]] = {}
+        self._investigation_reports: dict[UUID, InvestigationReport] = {}
+        self._investigation_failures: dict[UUID, InvestigationFailure] = {}
         self._event_ids: set[UUID] = set()
         self._artifact_ids: set[UUID] = set()
+        self._investigation_call_ids: set[UUID] = set()
         self._lock = RLock()
 
     def create_run(self, run: WorkflowRun) -> WorkflowRun:
@@ -117,6 +157,7 @@ class InMemoryTraceRepository:
             self._events[run.run_id] = []
             self._artifacts[run.run_id] = []
             self._erp_attempts[run.run_id] = []
+            self._investigation_calls[run.run_id] = []
             return stored.model_copy(deep=True)
 
     def get_run(self, run_id: UUID) -> WorkflowRun:
@@ -261,6 +302,114 @@ class InMemoryTraceRepository:
                 for attempt in self._erp_attempts[run_id]
             )
 
+    def transition_investigation(
+        self,
+        run_id: UUID,
+        target: InvestigationState,
+        *,
+        provider_mode: ProviderMode | None = None,
+    ) -> WorkflowRun:
+        with self._lock:
+            current = self._require_run(run_id)
+            if current.workflow_state is not WorkflowState.FAILED:
+                raise TraceRepositoryError(
+                    "Investigation state may change only for a failed workflow run."
+                )
+            ensure_investigation_transition(current.investigation_state, target)
+            updates: dict[str, object] = {"investigation_state": target}
+            if provider_mode is not None:
+                updates["investigation_provider_mode"] = provider_mode
+            updated = self._replace_run(current, **updates)
+            self._runs[run_id] = updated
+            return updated.model_copy(deep=True)
+
+    def append_investigation_tool_call(
+        self, call: InvestigationToolCall
+    ) -> InvestigationToolCall:
+        with self._lock:
+            self._require_run(call.run_id)
+            if call.call_id in self._investigation_call_ids:
+                raise DuplicateTraceRecordError(
+                    f"Investigation call already exists: {call.call_id}"
+                )
+            calls = self._investigation_calls[call.run_id]
+            if call.sequence_number != len(calls) + 1:
+                raise TraceRepositoryError(
+                    "Investigation tool-call sequence numbers must be contiguous."
+                )
+            stored = call.model_copy(deep=True)
+            calls.append(stored)
+            self._investigation_call_ids.add(call.call_id)
+            return stored.model_copy(deep=True)
+
+    def list_investigation_tool_calls(
+        self, run_id: UUID
+    ) -> tuple[InvestigationToolCall, ...]:
+        with self._lock:
+            self._require_run(run_id)
+            return tuple(
+                call.model_copy(deep=True)
+                for call in self._investigation_calls[run_id]
+            )
+
+    def complete_investigation(
+        self, report: InvestigationReport
+    ) -> WorkflowRun:
+        with self._lock:
+            current = self._require_run(report.run_id)
+            ensure_investigation_transition(
+                current.investigation_state, InvestigationState.COMPLETED
+            )
+            if report.run_id in self._investigation_reports:
+                raise DuplicateTraceRecordError(
+                    f"Investigation report already exists: {report.run_id}"
+                )
+            self._investigation_reports[report.run_id] = report.model_copy(deep=True)
+            updated = self._replace_run(
+                current, investigation_state=InvestigationState.COMPLETED
+            )
+            self._runs[report.run_id] = updated
+            return updated.model_copy(deep=True)
+
+    def get_investigation_report(self, run_id: UUID) -> InvestigationReport:
+        with self._lock:
+            self._require_run(run_id)
+            try:
+                return self._investigation_reports[run_id].model_copy(deep=True)
+            except KeyError as exc:
+                raise InvestigationRecordNotFoundError(
+                    f"No investigation report for run {run_id}"
+                ) from exc
+
+    def fail_investigation(
+        self, failure: InvestigationFailure
+    ) -> WorkflowRun:
+        with self._lock:
+            current = self._require_run(failure.run_id)
+            ensure_investigation_transition(
+                current.investigation_state, InvestigationState.FAILED
+            )
+            if failure.run_id in self._investigation_failures:
+                raise DuplicateTraceRecordError(
+                    f"Investigation failure already exists: {failure.run_id}"
+                )
+            self._investigation_failures[failure.run_id] = failure.model_copy(deep=True)
+            updated = self._replace_run(
+                current, investigation_state=InvestigationState.FAILED
+            )
+            self._runs[failure.run_id] = updated
+            return updated.model_copy(deep=True)
+
+    def get_investigation_failure(self, run_id: UUID) -> InvestigationFailure:
+        with self._lock:
+            self._require_run(run_id)
+            try:
+                return self._investigation_failures[run_id].model_copy(deep=True)
+            except KeyError as exc:
+                raise InvestigationRecordNotFoundError(
+                    f"No investigation failure for run {run_id}"
+                ) from exc
+
     def _require_run(self, run_id: UUID) -> WorkflowRun:
         try:
             return self._runs[run_id]
@@ -273,4 +422,3 @@ class InMemoryTraceRepository:
         values.update(updates)
         values["updated_at"] = utc_now()
         return WorkflowRun.model_validate(values)
-

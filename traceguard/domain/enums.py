@@ -8,6 +8,13 @@ class ProviderMode(StrEnum):
     LIVE = "LIVE"
 
 
+class DiagnosticToolName(StrEnum):
+    GET_RUN_OVERVIEW = "get_run_overview"
+    GET_RUN_EVENTS = "get_run_events"
+    GET_STAGE_ARTIFACT = "get_stage_artifact"
+    SEARCH_RUNBOOK = "search_runbook"
+
+
 class WorkflowState(StrEnum):
     CREATED = "CREATED"
     EXTRACTING = "EXTRACTING"
@@ -99,6 +106,26 @@ class EvidenceSource(StrEnum):
     VALIDATION = "VALIDATION"
     EXTERNAL_CALL = "EXTERNAL_CALL"
     RUNBOOK = "RUNBOOK"
+
+
+class EvidenceRole(StrEnum):
+    TERMINAL_CAUSE = "TERMINAL_CAUSE"
+    SUPPORTING = "SUPPORTING"
+    NON_CAUSAL_CONTEXT = "NON_CAUSAL_CONTEXT"
+
+
+class InvestigationFailureReason(StrEnum):
+    UNKNOWN_TOOL = "UNKNOWN_TOOL"
+    INVALID_TOOL_ARGUMENTS = "INVALID_TOOL_ARGUMENTS"
+    CROSS_RUN_ACCESS = "CROSS_RUN_ACCESS"
+    TOOL_EXECUTION_FAILED = "TOOL_EXECUTION_FAILED"
+    TOOL_CALL_LIMIT = "TOOL_CALL_LIMIT"
+    MODEL_TURN_LIMIT = "MODEL_TURN_LIMIT"
+    MODEL_REFUSAL = "MODEL_REFUSAL"
+    MODEL_TIMEOUT = "MODEL_TIMEOUT"
+    MODEL_FAILURE = "MODEL_FAILURE"
+    MALFORMED_REPORT = "MALFORMED_REPORT"
+    REPORT_NOT_GROUNDED = "REPORT_NOT_GROUNDED"
 
 
 class EventOutcome(StrEnum):

@@ -3,13 +3,14 @@
 ## Current State
 
 - Architecture and scope are approved.
-- Deterministic domain-core and Phases 2 and 3 are complete.
+- Deterministic domain-core and Phases 2 through 4 are complete.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
 - Implemented the protocol-backed in-memory trace repository, append-only events/artifacts, four editable fixtures, deterministic workflow orchestrator, and stateful mock ERP.
 - Implemented the shared extraction-provider protocol, explicit `SCRIPTED`/`LIVE` modes, exact-fixture scripted adapter, and live OpenAI Responses API structured-extraction adapter.
+- Implemented the five-entry tagged local runbook, deterministic exact-tag/lexical retrieval, exactly four scoped read-only tools, append-only tool-call history, causal evidence validation, and one three-turn/six-call investigator with scripted and live model paths.
 - Added minimal OpenAI dependency/environment declarations and a credential-gated live smoke entry point.
-- Added 96 focused unit and integration-style tests; the latest full run passed in 0.98 seconds with no network or API key.
-- No investigator loop, diagnostic tools, runbook retrieval, controlled recovery execution, FastAPI endpoint, UI, or deployment configuration exists yet.
+- Added 132 focused unit and integration-style tests; the latest full run passed in 1.87 seconds with no network or API key.
+- No controlled recovery execution, FastAPI endpoint, UI, deployment configuration, or final README work exists yet.
 
 ## Approved Architecture
 
@@ -32,13 +33,14 @@
 - Recovery states: `NONE`, `ALLOW`, `BLOCK`, `REQUIRE_REVIEW`, `RETRYING`, `RECOVERED`, `RETRY_EXHAUSTED`.
 - Event outcomes: `CONTINUED`, `RECOVERED`, `TERMINAL`, `SUCCESS`.
 - Extraction-provider modes: `SCRIPTED`, `LIVE`.
+- Evidence roles: `TERMINAL_CAUSE`, `SUPPORTING`, `NON_CAUSAL_CONTEXT`.
 - Core canonical errors: `ORDER_STRUCTURE_INVALID`, `CUSTOMER_NUMBER_MISSING`, `PRODUCT_CODE_MISSING`, `QUANTITY_MISSING`, `QUANTITY_NON_POSITIVE`, `ERP_UNAVAILABLE`.
 
 The deterministic workflow owns canonical errors. The investigator diagnoses and recommends but does not authorize or execute recovery.
 
 ## Next Implementation Task
 
-After explicit approval, implement Phase 4 only: tagged local runbook retrieval, four scoped read-only diagnostic tools, and the bounded investigator loop with structured report validation and terminal-evidence enforcement. Keep recovery execution, FastAPI routes, and UI out of that task.
+After explicit approval, implement Phase 5 only: connect validated investigation reports to the existing deterministic recovery policy and add one idempotent, policy-authorized ERP retry path. Keep FastAPI routes and UI out of that task unless separately approved.
 
 ## Phase 1 Implementation Notes
 
@@ -52,7 +54,7 @@ After explicit approval, implement Phase 4 only: tagged local runbook retrieval,
 
 - Workflow runs retain the submitted text unchanged, preset metadata, explicit ERP behavior, orthogonal states, canonical deterministic failure facts, idempotency key, attempt count, and timestamps.
 - Repository event and artifact histories are append-only; collection reads return tuples and artifact reads are deep copies.
-- The orchestrator receives an injected extraction callable and reuses every Phase 1 validation boundary. It never branches on `preset_id`.
+- Phase 2 initially used an injected extraction callable; Phase 3 replaced it with the explicit extraction-provider protocol. The orchestrator reuses every Phase 1 validation boundary and never branches on `preset_id`.
 - Failed runs retain their complete trace and enter investigation state `PENDING`; successful runs retain no failure facts.
 - `FAIL_ONCE_503` records the optional-field warning only when validated delivery instructions are absent, then records the recovered cache failure, successful fallback, and terminal ERP 503 in order. The fixture retains the full noisy sequence; a direct adapter-level second attempt succeeds, but no recovery execution path exists.
 - Phase 2 introduced no architectural deviation from the approved plan.
@@ -67,6 +69,18 @@ After explicit approval, implement Phase 4 only: tagged local runbook retrieval,
 - Provider mode is retained as run metadata. Moving this cross-cutting enum to the domain enum module resolved an initial package import cycle without changing the approved responsibility boundaries.
 - The credential-gated smoke entry point was executed locally and skipped cleanly because no API key was present; no real live call has yet been verified.
 
+## Phase 4 Implementation Notes
+
+- The runbook contains five stable entries covering extraction failure, structural failure, missing required input, non-positive quantity, and ERP unavailability. Ranking uses exact supplied error-code/tag match, then normalized token overlap, then stable entry ID.
+- The registry exposes only `get_run_overview`, `get_run_events`, `get_stage_artifact`, and `search_runbook`. Pydantic argument schemas, current-run UUID checks, bounded JSON results, and repository read methods enforce the boundary.
+- `get_run_overview` omits canonical error code/category and root cause. Initial model context contains the run ID, role, hard budgets, and untrusted-data warning but no trace or canonical run failure.
+- Evidence items now carry `TERMINAL_CAUSE`, `SUPPORTING`, or `NON_CAUSAL_CONTEXT`. Validation requires causal terminal evidence, target-run ownership, prior retrieval through `get_run_events`, and prior retrieval of cited runbook IDs. It deliberately does not compare diagnosis to the hidden canonical workflow error.
+- Tool-call records are append-only and include sequence, validated/sanitized arguments, success/failure, and bounded results. Investigation reports and sanitized failures are additive; workflow events, artifacts, canonical failure facts, ERP attempts, and recovery state remain unchanged.
+- `ScriptedInvestigatorModel` is explicitly deterministic/non-AI but executes the real tools and derives reports from returned events, artifacts, and runbook results without using `preset_id`.
+- `OpenAIInvestigatorModel` uses the official Responses API `responses.parse` tool loop with strict function schemas, structured `InvestigationReport`, `store=False`, disabled parallel calls, a bounded timeout, and stateless replay of response items plus function outputs.
+- Runs retain separate extraction and investigation provider-mode metadata. `TRACEGUARD_OPENAI_INVESTIGATOR_MODEL` overrides the shared model setting when present.
+- The live investigator smoke entry point skipped cleanly because no API key was available; the external live investigator remains unverified locally.
+
 ## Constraints That Must Not Be Violated
 
 - Use `REQUIRE_REVIEW` consistently for human correction or review.
@@ -78,6 +92,7 @@ After explicit approval, implement Phase 4 only: tagged local runbook retrieval,
 - Keep investigator tools read-only, allowlisted, bounded, and scoped to the current run.
 - Make continued/recovered noise distinguishable from terminal evidence.
 - Require terminal evidence in the investigation report.
+- Require cited event and runbook evidence to have been retrieved through actual successful tool calls.
 - Default deterministic policy to `BLOCK` for invalid, conflicting, or unknown conditions.
 - Preserve failed traces; corrected input creates a new run.
 - Do not add multiple agents, React, database persistence, vector RAG, or general autonomous remediation.

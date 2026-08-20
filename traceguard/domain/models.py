@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_v
 from traceguard.domain.enums import (
     CanonicalErrorCode,
     Confidence,
+    EvidenceRole,
     EvidenceSource,
     FailureCategory,
     PolicyDecisionType,
@@ -52,8 +53,8 @@ class ValidatedOrder(DomainModel):
 
 
 class EvidenceItem(DomainModel):
-    event_id: str = Field(min_length=1, max_length=100)
-    source: EvidenceSource
+    event_id: UUID
+    role: EvidenceRole
     observation: str = Field(min_length=1, max_length=240)
 
 

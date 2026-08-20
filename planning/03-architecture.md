@@ -114,7 +114,9 @@ The tool registry exposes exactly:
 
 All tools validate arguments, enforce the current run scope, cap response sizes, and perform no writes. The loop permits at most three model turns and six tool calls. Duplicate invalid calls, unknown tools, timeouts, or exhausted budgets terminate the investigation safely.
 
-The structured report includes the diagnosed category and code, root cause, one to five evidence references, an enum recommendation, rationale, confidence, uncertainties, and runbook references. At least one evidence item must cite the terminal event. Continued or recovered events may appear only as explicitly non-causal context.
+The structured report includes the diagnosed category and code, root cause, one to five evidence references, an enum recommendation, rationale, confidence, uncertainties, and runbook references. At least one evidence item must cite the terminal event as `TERMINAL_CAUSE`. Continued or recovered events may appear only as `NON_CAUSAL_CONTEXT`. Cited event IDs and runbook IDs must have appeared in successful tool results for that investigation; repository existence alone is insufficient.
+
+Runs retain extraction-provider mode and investigation-provider mode separately so scripted and live behavior remain observable without conflating the two stages.
 
 ## Local Runbook Retrieval
 

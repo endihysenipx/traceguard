@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from traceguard.domain.enums import (
     CanonicalErrorCode,
     Confidence,
-    EvidenceSource,
+    EvidenceRole,
     FailureCategory,
     RecoveryAction,
 )
@@ -26,8 +26,8 @@ def valid_report_values() -> dict[str, object]:
         "root_cause": "The ERP returned HTTP 503.",
         "evidence": [
             EvidenceItem(
-                event_id="event-1",
-                source=EvidenceSource.EXTERNAL_CALL,
+                event_id=uuid4(),
+                role=EvidenceRole.TERMINAL_CAUSE,
                 observation="The terminal ERP call returned 503.",
             )
         ],
@@ -76,4 +76,3 @@ def test_retry_metadata_allows_absent_idempotency_for_fail_closed_policy() -> No
     metadata = RetryMetadata(attempt_count=1)
 
     assert metadata.idempotency_key is None
-
