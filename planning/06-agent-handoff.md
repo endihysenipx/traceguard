@@ -3,10 +3,11 @@
 ## Current State
 
 - Architecture and scope are approved.
-- Deterministic domain-core phase is complete.
+- Deterministic domain-core and Phase 2 workflow/trace phases are complete.
 - Implemented core enums and canonical errors, immutable Pydantic contracts, separated structural/domain/business validation, three legal-transition tables, and fail-closed deterministic recovery policy.
-- Added 60 focused unit tests; the latest full run passed in 0.16 seconds.
-- No workflow repository/orchestrator, LLM provider, investigator loop, tools, runbook retrieval, mock ERP, FastAPI endpoint, UI, integration test, or deployment configuration exists yet.
+- Implemented the protocol-backed in-memory trace repository, append-only events/artifacts, four editable fixtures, deterministic workflow orchestrator, and stateful mock ERP.
+- Added 77 focused unit and integration-style tests; the latest full run passed in 0.24 seconds.
+- No live/scripted LLM provider, investigator loop, diagnostic tools, runbook retrieval, controlled recovery execution, FastAPI endpoint, UI, or deployment configuration exists yet.
 
 ## Approved Architecture
 
@@ -34,7 +35,7 @@ The deterministic workflow owns canonical errors. The investigator diagnoses and
 
 ## Next Implementation Task
 
-After explicit approval, implement Phase 2 only: the in-memory trace repository, append-only event contracts, four editable fixture definitions, workflow orchestration, and stateful mock ERP with the intentionally noisy fail-once-503 trace. Do not begin the LLM, investigator, retrieval, API, or UI layers as part of that task.
+After explicit approval, implement Phase 3 only: the shared extraction-provider boundary, fixture-limited scripted extraction adapter, and live structured-extraction adapter. Preserve exact submitted text, reject unsupported custom text in scripted mode, and keep investigation, diagnostic tools, runbook retrieval, recovery execution, API, and UI out of that task.
 
 ## Phase 1 Implementation Notes
 
@@ -43,6 +44,15 @@ After explicit approval, implement Phase 2 only: the in-memory trace repository,
 - `PolicyInput` permits absent diagnosed fields only so malformed or unavailable investigation output can be represented without invented values; policy returns `BLOCK` with `INVALID_INVESTIGATION`.
 - Policy checks both diagnosed code and diagnosed category against the deterministic canonical mapping before considering an action.
 - These are contract refinements, not changes to the approved responsibility or recovery boundaries.
+
+## Phase 2 Implementation Notes
+
+- Workflow runs retain the submitted text unchanged, preset metadata, explicit ERP behavior, orthogonal states, canonical deterministic failure facts, idempotency key, attempt count, and timestamps.
+- Repository event and artifact histories are append-only; collection reads return tuples and artifact reads are deep copies.
+- The orchestrator receives an injected extraction callable and reuses every Phase 1 validation boundary. It never branches on `preset_id`.
+- Failed runs retain their complete trace and enter investigation state `PENDING`; successful runs retain no failure facts.
+- `FAIL_ONCE_503` records the optional-field warning, recovered cache failure, successful fallback, and terminal ERP 503 in order. A direct adapter-level second attempt succeeds, but no recovery execution path exists.
+- Phase 2 introduced no architectural deviation from the approved plan.
 
 ## Constraints That Must Not Be Violated
 
